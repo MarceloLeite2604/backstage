@@ -15,36 +15,52 @@
  */
 
 import express from 'express';
+import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Logger } from 'winston';
+import { CatalogIdentityClient } from '../../lib/catalog';
 import {
+  encodeState,
+  OAuthAdapter,
+  OAuthEnvironmentHandler,
+  OAuthHandlers,
+  OAuthProviderOptions,
+  OAuthRefreshRequest,
+  OAuthResponse,
+  OAuthStartRequest,
+  OAuthResult,
+} from '../../lib/oauth';
+import {
+  executeFetchUserProfileStrategy,
   executeFrameHandlerStrategy,
   executeRedirectStrategy,
   executeRefreshTokenStrategy,
   makeProfileInfo,
-  executeFetchUserProfileStrategy,
-} from '../../lib/PassportStrategyHelper';
-import {
-  OAuthProviderHandlers,
-  RedirectInfo,
-  AuthProviderConfig,
-  OAuthProviderOptions,
-  OAuthResponse,
   PassportDoneCallback,
-} from '../types';
-import { OAuthProvider } from '../../lib/OAuthProvider';
-import passport from 'passport';
-import { Logger } from 'winston';
+} from '../../lib/passport';
+import { AuthProviderFactory, RedirectInfo } from '../types';
 import { TokenIssuer } from '../../identity';
-import { Config } from '@backstage/config';
 
 type PrivateInfo = {
   refreshToken: string;
 };
 
-export class GoogleAuthProvider implements OAuthProviderHandlers {
-  private readonly _strategy: GoogleStrategy;
+type Options = OAuthProviderOptions & {
+  logger: Logger;
+  identityClient: CatalogIdentityClient;
+  tokenIssuer: TokenIssuer;
+};
 
-  constructor(options: OAuthProviderOptions) {
+export class GoogleAuthProvider implements OAuthHandlers {
+  private readonly _strategy: GoogleStrategy;
+  private readonly logger: Logger;
+  private readonly identityClient: CatalogIdentityClient;
+  private readonly tokenIssuer: TokenIssuer;
+
+  constructor(options: Options) {
+    this.logger = options.logger;
+    this.identityClient = options.identityClient;
+    this.tokenIssuer = options.tokenIssuer;
     // TODO: throw error if env variables not set?
     this._strategy = new GoogleStrategy(
       {
@@ -59,20 +75,16 @@ export class GoogleAuthProvider implements OAuthProviderHandlers {
         accessToken: any,
         refreshToken: any,
         params: any,
-        rawProfile: passport.Profile,
-        done: PassportDoneCallback<OAuthResponse, PrivateInfo>,
+        fullProfile: passport.Profile,
+        done: PassportDoneCallback<OAuthResult, PrivateInfo>,
       ) => {
-        const profile = makeProfileInfo(rawProfile, params.id_token);
         done(
           undefined,
           {
-            providerInfo: {
-              idToken: params.id_token,
-              accessToken,
-              scope: params.scope,
-              expiresInSeconds: params.expires_in,
-            },
-            profile,
+            fullProfile,
+            params,
+            accessToken,
+            refreshToken,
           },
           {
             refreshToken,
@@ -82,44 +94,51 @@ export class GoogleAuthProvider implements OAuthProviderHandlers {
     );
   }
 
-  async start(
-    req: express.Request,
-    options: Record<string, string>,
-  ): Promise<RedirectInfo> {
-    const providerOptions = {
-      ...options,
+  async start(req: OAuthStartRequest): Promise<RedirectInfo> {
+    return await executeRedirectStrategy(req, this._strategy, {
       accessType: 'offline',
       prompt: 'consent',
-    };
-    return await executeRedirectStrategy(req, this._strategy, providerOptions);
+      scope: req.scope,
+      state: encodeState(req.state),
+    });
   }
 
   async handler(
     req: express.Request,
   ): Promise<{ response: OAuthResponse; refreshToken: string }> {
-    const { response, privateInfo } = await executeFrameHandlerStrategy<
-      OAuthResponse,
+    const { result, privateInfo } = await executeFrameHandlerStrategy<
+      OAuthResult,
       PrivateInfo
     >(req, this._strategy);
 
+    const profile = makeProfileInfo(result.fullProfile, result.params.id_token);
+
     return {
-      response: await this.populateIdentity(response),
+      response: await this.populateIdentity({
+        providerInfo: {
+          idToken: result.params.id_token,
+          accessToken: result.accessToken,
+          scope: result.params.scope,
+          expiresInSeconds: result.params.expires_in,
+        },
+        profile,
+      }),
       refreshToken: privateInfo.refreshToken,
     };
   }
 
-  async refresh(refreshToken: string, scope: string): Promise<OAuthResponse> {
+  async refresh(req: OAuthRefreshRequest): Promise<OAuthResponse> {
     const { accessToken, params } = await executeRefreshTokenStrategy(
       this._strategy,
-      refreshToken,
-      scope,
+      req.refreshToken,
+      req.scope,
     );
 
-    const profile = await executeFetchUserProfileStrategy(
+    const fullProfile = await executeFetchUserProfileStrategy(
       this._strategy,
       accessToken,
-      params.id_token,
     );
+    const profile = makeProfileInfo(fullProfile, params.id_token);
 
     return this.populateIdentity({
       providerInfo: {
@@ -141,34 +160,68 @@ export class GoogleAuthProvider implements OAuthProviderHandlers {
       throw new Error('Google profile contained no email');
     }
 
-    // TODO(Rugvip): Hardcoded to the local part of the email for now
-    const id = profile.email.split('@')[0];
+    try {
+      const token = await this.tokenIssuer.issueToken({
+        claims: { sub: 'backstage.io/auth-backend' },
+      });
+      const user = await this.identityClient.findUser(
+        {
+          annotations: {
+            'google.com/email': profile.email,
+          },
+        },
+        { token },
+      );
 
-    return { ...response, backstageIdentity: { id } };
+      return {
+        ...response,
+        backstageIdentity: {
+          id: user.metadata.name,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to look up user, ${error}, falling back to allowing login based on email pattern, this will probably break in the future`,
+      );
+      return {
+        ...response,
+        backstageIdentity: { id: profile.email.split('@')[0] },
+      };
+    }
   }
 }
 
-export function createGoogleProvider(
-  config: AuthProviderConfig,
-  _: string,
-  envConfig: Config,
-  _logger: Logger,
-  tokenIssuer: TokenIssuer,
-) {
-  const providerId = 'google';
-  const clientId = envConfig.getString('clientId');
-  const clientSecret = envConfig.getString('clientSecret');
-  const callbackUrl = `${config.baseUrl}/${providerId}/handler/frame`;
+export type GoogleProviderOptions = {};
 
-  const provider = new GoogleAuthProvider({
-    clientId,
-    clientSecret,
-    callbackUrl,
-  });
-
-  return OAuthProvider.fromConfig(config, provider, {
-    disableRefresh: false,
+export const createGoogleProvider = (
+  _options?: GoogleProviderOptions,
+): AuthProviderFactory => {
+  return ({
     providerId,
+    globalConfig,
+    config,
+    logger,
     tokenIssuer,
-  });
-}
+    catalogApi,
+  }) =>
+    OAuthEnvironmentHandler.mapConfig(config, envConfig => {
+      const clientId = envConfig.getString('clientId');
+      const clientSecret = envConfig.getString('clientSecret');
+      const callbackUrl = `${globalConfig.baseUrl}/${providerId}/handler/frame`;
+
+      const provider = new GoogleAuthProvider({
+        clientId,
+        clientSecret,
+        callbackUrl,
+        logger,
+        tokenIssuer,
+        identityClient: new CatalogIdentityClient({ catalogApi }),
+      });
+
+      return OAuthAdapter.fromConfig(globalConfig, provider, {
+        disableRefresh: false,
+        providerId,
+        tokenIssuer,
+      });
+    });
+};

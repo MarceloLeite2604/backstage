@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Spotify AB
+ * Copyright 2021 Spotify AB
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,9 @@
  * limitations under the License.
  */
 
-import { createRouteRef } from '@backstage/core';
+import { createExternalRouteRef } from '@backstage/core';
 
-const NoIcon = () => null;
-
-export const rootRoute = createRouteRef({
-  icon: NoIcon,
-  path: '/',
-  title: 'Catalog',
-});
-export const entityRoute = createRouteRef({
-  icon: NoIcon,
-  path: '/catalog/:kind/:optionalNamespaceAndName/:selectedTabId/*',
-  title: 'Entity',
-});
-export const entityRouteDefault = createRouteRef({
-  icon: NoIcon,
-  path: '/catalog/:kind/:optionalNamespaceAndName',
-  title: 'Entity',
+export const createComponentRouteRef = createExternalRouteRef({
+  id: 'create-component',
+  optional: true,
 });

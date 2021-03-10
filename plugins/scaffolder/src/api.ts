@@ -14,60 +14,217 @@
  * limitations under the License.
  */
 
-import { createApiRef } from '@backstage/core';
-import { TemplateEntityV1alpha1 } from '@backstage/catalog-model';
+import { EntityName } from '@backstage/catalog-model';
+import { JsonObject } from '@backstage/config';
+import {
+  createApiRef,
+  DiscoveryApi,
+  Observable,
+  ConfigApi,
+  IdentityApi,
+} from '@backstage/core';
+import { ScmIntegrations } from '@backstage/integration';
+import ObservableImpl from 'zen-observable';
+import { ScaffolderTask, Status } from './types';
 
 export const scaffolderApiRef = createApiRef<ScaffolderApi>({
   id: 'plugin.scaffolder.service',
   description: 'Used to make requests towards the scaffolder backend',
 });
 
-export class ScaffolderApi {
-  private apiOrigin: string;
-  private basePath: string;
+type TemplateParameterSchema = {
+  title: string;
+  steps: Array<{
+    title: string;
+    schema: JsonObject;
+  }>;
+};
 
-  constructor({
-    apiOrigin,
-    basePath,
+export type LogEvent = {
+  type: 'log' | 'completion';
+  body: {
+    message: string;
+    stepId?: string;
+    status?: Status;
+  };
+  createdAt: string;
+  id: string;
+  taskId: string;
+};
+
+export interface ScaffolderApi {
+  getTemplateParameterSchema(
+    templateName: EntityName,
+  ): Promise<TemplateParameterSchema>;
+
+  /**
+   * Executes the scaffolding of a component, given a template and its
+   * parameter values.
+   *
+   * @param templateName Name of the Template entity for the scaffolder to use. New project is going to be created out of this template.
+   * @param values Parameters for the template, e.g. name, description
+   */
+  scaffold(templateName: string, values: Record<string, any>): Promise<string>;
+
+  getTask(taskId: string): Promise<ScaffolderTask>;
+
+  getIntegrationsList(options: {
+    allowedHosts: string[];
+  }): Promise<{ type: string; title: string; host: string }[]>;
+
+  streamLogs({
+    taskId,
+    after,
   }: {
-    apiOrigin: string;
-    basePath: string;
+    taskId: string;
+    after?: number;
+  }): Observable<LogEvent>;
+}
+export class ScaffolderClient implements ScaffolderApi {
+  private readonly discoveryApi: DiscoveryApi;
+  private readonly identityApi: IdentityApi;
+  private readonly configApi: ConfigApi;
+
+  constructor(options: {
+    discoveryApi: DiscoveryApi;
+    identityApi: IdentityApi;
+    configApi: ConfigApi;
   }) {
-    this.apiOrigin = apiOrigin;
-    this.basePath = basePath;
+    this.discoveryApi = options.discoveryApi;
+    this.identityApi = options.identityApi;
+    this.configApi = options.configApi;
+  }
+
+  async getIntegrationsList(options: { allowedHosts: string[] }) {
+    const integrations = ScmIntegrations.fromConfig(
+      this.configApi.getConfig('integrations'),
+    );
+
+    return [
+      ...integrations.azure.list(),
+      ...integrations.bitbucket.list(),
+      ...integrations.github.list(),
+      ...integrations.gitlab.list(),
+    ]
+      .map(c => ({ type: c.type, title: c.title, host: c.config.host }))
+      .filter(c => options.allowedHosts.includes(c.host));
+  }
+
+  async getTemplateParameterSchema(
+    templateName: EntityName,
+  ): Promise<TemplateParameterSchema> {
+    const { namespace, kind, name } = templateName;
+
+    const token = await this.identityApi.getIdToken();
+    const baseUrl = await this.discoveryApi.getBaseUrl('scaffolder');
+    const templatePath = [namespace, kind, name]
+      .map(s => encodeURIComponent(s))
+      .join('/');
+    const url = `${baseUrl}/v2/templates/${templatePath}/parameter-schema`;
+
+    const response = await fetch(url, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch template parameter schema, ${await response.text()}`,
+      );
+    }
+
+    const schema: TemplateParameterSchema = await response.json();
+    return schema;
   }
 
   /**
+   * Executes the scaffolding of a component, given a template and its
+   * parameter values.
    *
-   * @param template Template entity for the scaffolder to use. New project is going to be created out of this template.
+   * @param templateName Template name for the scaffolder to use. New project is going to be created out of this template.
    * @param values Parameters for the template, e.g. name, description
    */
   async scaffold(
-    template: TemplateEntityV1alpha1,
+    templateName: string,
     values: Record<string, any>,
-  ) {
-    const url = `${this.apiOrigin}${this.basePath}/jobs`;
+  ): Promise<string> {
+    const token = await this.identityApi.getIdToken();
+    const url = `${await this.discoveryApi.getBaseUrl('scaffolder')}/v2/tasks`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
-      // TODO(shmidt-i): when repo picker is implemented, take isOrg from it
-      body: JSON.stringify({ template, values: { ...values, isOrg: true } }),
+      body: JSON.stringify({ templateName, values: { ...values } }),
     });
 
     if (response.status !== 201) {
-      throw new Error(await response.text());
+      const status = `${response.status} ${response.statusText}`;
+      const body = await response.text();
+      throw new Error(`Backend request failed, ${status} ${body.trim()}`);
     }
 
-    const { id } = await response.json();
+    const { id } = (await response.json()) as { id: string };
     return id;
   }
 
-  async getJob(jobId: string) {
-    const url = `${this.apiOrigin}${this.basePath}/job/${encodeURIComponent(
-      jobId,
-    )}`;
-    return fetch(url).then(x => x.json());
+  async getTask(taskId: string) {
+    const token = await this.identityApi.getIdToken();
+    const baseUrl = await this.discoveryApi.getBaseUrl('scaffolder');
+    const url = `${baseUrl}/v2/tasks/${encodeURIComponent(taskId)}`;
+    return fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(x => x.json());
+  }
+
+  streamLogs({
+    taskId,
+    after,
+  }: {
+    taskId: string;
+    after?: number;
+  }): Observable<LogEvent> {
+    return new ObservableImpl(subscriber => {
+      const params = new URLSearchParams();
+      if (after !== undefined) {
+        params.set('after', String(Number(after)));
+      }
+
+      this.discoveryApi.getBaseUrl('scaffolder').then(
+        baseUrl => {
+          const url = `${baseUrl}/v2/tasks/${encodeURIComponent(
+            taskId,
+          )}/eventstream`;
+          const eventSource = new EventSource(url);
+          eventSource.addEventListener('log', (event: any) => {
+            if (event.data) {
+              try {
+                subscriber.next(JSON.parse(event.data));
+              } catch (ex) {
+                subscriber.error(ex);
+              }
+            }
+          });
+          eventSource.addEventListener('completion', (event: any) => {
+            if (event.data) {
+              try {
+                subscriber.next(JSON.parse(event.data));
+              } catch (ex) {
+                subscriber.error(ex);
+              }
+            }
+            subscriber.complete();
+          });
+          eventSource.addEventListener('error', event => {
+            subscriber.error(event);
+          });
+        },
+        error => {
+          subscriber.error(error);
+        },
+      );
+    });
   }
 }

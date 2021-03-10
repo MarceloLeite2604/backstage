@@ -68,7 +68,17 @@ export type Entry = {
   url?: string;
   // How this entry has recently moved; -1 for "down", +1 for "up", 0 for not moved
   moved?: MovedState;
+  // Most recent description to display in the UI
+  description?: string;
   active?: boolean;
+  timeline?: Array<EntrySnapshot>;
+};
+
+export type EntrySnapshot = {
+  date: Date;
+  ring: Ring;
+  description?: string;
+  moved?: MovedState;
 };
 
 // The same as Entry except quadrant/ring are declared by their string ID instead of being the actual objects

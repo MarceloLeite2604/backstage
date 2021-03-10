@@ -1,7 +1,7 @@
 {
   "name": "@backstage/create-app",
   "description": "Create app package for Backstage",
-  "version": "0.1.1-alpha.19",
+  "version": "0.3.12",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -9,7 +9,7 @@
   "homepage": "https://backstage.io",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spotify/backstage",
+    "url": "https://github.com/backstage/backstage",
     "directory": "packages/create-app"
   },
   "keywords": [
@@ -27,9 +27,9 @@
     "start": "nodemon --"
   },
   "dependencies": {
-    "@backstage/cli-common": "^0.1.1-alpha.19",
+    "@backstage/cli-common": "^0.1.1",
     "chalk": "^4.0.0",
-    "commander": "^4.1.1",
+    "commander": "^6.1.0",
     "fs-extra": "^9.0.0",
     "handlebars": "^4.7.3",
     "inquirer": "^7.0.4",
@@ -38,11 +38,43 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^9.0.1",
-    "@types/inquirer": "^6.5.0",
-    "@types/ora": "^3.2.0",
+    "@types/inquirer": "^7.3.1",
     "@types/react-dev-utils": "^9.0.4",
     "@types/recursive-readdir": "^2.2.0",
     "ts-node": "^8.6.2"
+  },
+  "peerDependencies": {
+    "@backstage/backend-common": "*",
+    "@backstage/catalog-client": "*",
+    "@backstage/catalog-model": "*",
+    "@backstage/cli": "*",
+    "@backstage/config": "*",
+    "@backstage/core": "*",
+    "@backstage/plugin-api-docs": "*",
+    "@backstage/plugin-app-backend": "*",
+    "@backstage/plugin-auth-backend": "*",
+    "@backstage/plugin-catalog": "*",
+    "@backstage/plugin-catalog-backend": "*",
+    "@backstage/plugin-catalog-import": "*",
+    "@backstage/plugin-explore": "*",
+    "@backstage/plugin-github-actions": "*",
+    "@backstage/plugin-lighthouse": "*",
+    "@backstage/plugin-proxy-backend": "*",
+    "@backstage/plugin-rollbar-backend": "*",
+    "@backstage/plugin-scaffolder": "*",
+    "@backstage/plugin-search": "*",
+    "@backstage/plugin-scaffolder-backend": "*",
+    "@backstage/plugin-tech-radar": "*",
+    "@backstage/plugin-techdocs": "*",
+    "@backstage/plugin-techdocs-backend": "*",
+    "@backstage/plugin-user-settings": "*",
+    "@backstage/test-utils": "*",
+    "@backstage/theme": "*"
+  },
+  "nodemonConfig": {
+    "watch": "./src",
+    "exec": "bin/backstage-create-app",
+    "ext": "ts"
   },
   "files": [
     "bin",

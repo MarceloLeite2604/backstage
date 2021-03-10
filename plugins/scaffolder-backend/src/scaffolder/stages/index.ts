@@ -16,3 +16,6 @@
 export * from './prepare';
 export * from './publish';
 export * from './templater';
+export * from './helpers';
+
+export { createLegacyActions } from './legacy';

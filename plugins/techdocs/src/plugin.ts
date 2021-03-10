@@ -29,24 +29,85 @@
  * limitations under the License.
  */
 
-import { createPlugin, createRouteRef } from '@backstage/core';
-import { TechDocsHome } from './reader/components/TechDocsHome';
-import { TechDocsPage } from './reader/components/TechDocsPage';
+import {
+  createPlugin,
+  createRouteRef,
+  createApiFactory,
+  configApiRef,
+  discoveryApiRef,
+  identityApiRef,
+  createRoutableExtension,
+} from '@backstage/core';
+import {
+  techdocsStorageApiRef,
+  TechDocsStorageApi,
+  techdocsApiRef,
+  TechDocsApi,
+} from './api';
 
 export const rootRouteRef = createRouteRef({
-  path: '/docs',
+  path: '',
   title: 'TechDocs Landing Page',
 });
 
 export const rootDocsRouteRef = createRouteRef({
-  path: '/docs/:entityId/*',
+  path: ':namespace/:kind/:name/*',
   title: 'Docs',
 });
 
-export const plugin = createPlugin({
+export const rootCatalogDocsRouteRef = createRouteRef({
+  path: '*',
+  title: 'Docs',
+});
+
+export const techdocsPlugin = createPlugin({
   id: 'techdocs',
-  register({ router }) {
-    router.addRoute(rootRouteRef, TechDocsHome);
-    router.addRoute(rootDocsRouteRef, TechDocsPage);
+  apis: [
+    createApiFactory({
+      api: techdocsStorageApiRef,
+      deps: {
+        configApi: configApiRef,
+        discoveryApi: discoveryApiRef,
+        identityApi: identityApiRef,
+      },
+      factory: ({ configApi, discoveryApi, identityApi }) =>
+        new TechDocsStorageApi({
+          configApi,
+          discoveryApi,
+          identityApi,
+        }),
+    }),
+    createApiFactory({
+      api: techdocsApiRef,
+      deps: {
+        configApi: configApiRef,
+        discoveryApi: discoveryApiRef,
+        identityApi: identityApiRef,
+      },
+      factory: ({ configApi, discoveryApi, identityApi }) =>
+        new TechDocsApi({
+          configApi,
+          discoveryApi,
+          identityApi,
+        }),
+    }),
+  ],
+  routes: {
+    root: rootRouteRef,
+    entityContent: rootCatalogDocsRouteRef,
   },
 });
+
+export const TechdocsPage = techdocsPlugin.provide(
+  createRoutableExtension({
+    component: () => import('./Router').then(m => m.Router),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const EntityTechdocsContent = techdocsPlugin.provide(
+  createRoutableExtension({
+    component: () => import('./Router').then(m => m.EmbeddedDocsRouter),
+    mountPoint: rootCatalogDocsRouteRef,
+  }),
+);

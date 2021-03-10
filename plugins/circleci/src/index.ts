@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 
-export { plugin } from './plugin';
+export {
+  circleCIPlugin,
+  circleCIPlugin as plugin,
+  EntityCircleCIContent,
+} from './plugin';
 export * from './api';
 export * from './route-refs';
-export { CircleCIWidget } from './components/App';
+export {
+  Router,
+  isCircleCIAvailable,
+  isCircleCIAvailable as isPluginApplicableToEntity,
+} from './components/Router';
+export { CIRCLECI_ANNOTATION } from './constants';

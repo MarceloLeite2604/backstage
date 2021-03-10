@@ -15,14 +15,6 @@
  */
 
 import { createDevApp } from '@backstage/dev-utils';
-import { plugin } from '../src/plugin';
-import { circleCIApiRef, CircleCIApi } from '../src/api';
+import { circleCIPlugin } from '../src/plugin';
 
-createDevApp()
-  .registerPlugin(plugin)
-  .registerApiFactory({
-    deps: {},
-    factory: () => new CircleCIApi(),
-    implements: circleCIApiRef,
-  })
-  .render();
+createDevApp().registerPlugin(circleCIPlugin).render();

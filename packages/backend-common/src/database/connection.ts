@@ -14,31 +14,53 @@
  * limitations under the License.
  */
 
-import knex from 'knex';
-import { ConfigReader } from '@backstage/config';
+import knexFactory, { Knex } from 'knex';
+import { Config } from '@backstage/config';
 import { mergeDatabaseConfig } from './config';
-import { createPgDatabase } from './postgres';
-import { createSqlite3Database } from './sqlite3';
+import { createPgDatabaseClient, ensurePgDatabaseExists } from './postgres';
+import { createSqliteDatabaseClient } from './sqlite3';
 
 type DatabaseClient = 'pg' | 'sqlite3' | string;
 
 /**
  * Creates a knex database connection
  *
- * @param config The database config
+ * @param dbConfig The database config
  * @param overrides Additional options to merge with the config
  */
-export function createDatabase(
-  config: ConfigReader,
-  overrides?: Partial<knex.Config>,
+export function createDatabaseClient(
+  dbConfig: Config,
+  overrides?: Partial<Knex.Config>,
 ) {
-  const client: DatabaseClient = config.getString('client');
+  const client: DatabaseClient = dbConfig.getString('client');
 
   if (client === 'pg') {
-    return createPgDatabase(config, overrides);
+    return createPgDatabaseClient(dbConfig, overrides);
   } else if (client === 'sqlite3') {
-    return createSqlite3Database(config);
+    return createSqliteDatabaseClient(dbConfig);
   }
 
-  return knex(mergeDatabaseConfig(config.get(), overrides));
+  return knexFactory(mergeDatabaseConfig(dbConfig.get(), overrides));
+}
+
+/**
+ * Alias for createDatabaseClient
+ * @deprecated Use createDatabaseClient instead
+ */
+export const createDatabase = createDatabaseClient;
+
+/**
+ * Ensures that the given databases all exist, creating them if they do not.
+ */
+export async function ensureDatabaseExists(
+  dbConfig: Config,
+  ...databases: Array<string>
+) {
+  const client: DatabaseClient = dbConfig.getString('client');
+
+  if (client === 'pg') {
+    return ensurePgDatabaseExists(dbConfig, ...databases);
+  }
+
+  return undefined;
 }

@@ -1,4 +1,8 @@
-# Installing in your Backstage App
+---
+id: installation
+title: Installing in your Backstage App
+description: Documentation on How to install Backstage App
+---
 
 The scaffolder plugin comes in two packages, `@backstage/plugin-scaffolder` and
 `@backstage/plugin-scaffolder-backend`. Each has their own installation steps,
@@ -29,27 +33,27 @@ it doesn't.
 Add the following entry to the head of your `packages/app/src/plugins.ts`:
 
 ```ts
-export { plugin as ScaffolderPlugin } from '@backstage/plugin-scaffolder';
+export { scaffolderPlugin } from '@backstage/plugin-scaffolder';
 ```
 
-Add the following to your `packages/app/src/apis.ts`:
+Next we need to install the root page that the Scaffolder plugin provides. You
+can choose any path for the route, but we recommend the following:
 
-```ts
-import { scaffolderApiRef, ScaffolderApi } from '@backstage/plugin-scaffolder';
+```tsx
+import { ScaffolderPage } from '@backstage/plugin-scaffolder';
 
-// Inside the ApiRegistry builder function ...
-
-builder.add(
-  scaffolderApiRef,
-  new ScaffolderApi({
-    apiOrigin: backendUrl,
-    basePath: '/scaffolder/v1',
-  }),
-);
+// Add to the top-level routes, directly within <FlatRoutes>
+<Route path="/create" element={<ScaffolderPage />} />;
 ```
 
-Where `backendUrl` is the `backend.baseUrl` from config, i.e.
-`const backendUrl = config.getString('backend.baseUrl')`.
+You may also want to add a link to the template index page to your sidebar:
+
+```tsx
+import CreateComponentIcon from '@material-ui/icons/AddCircleOutline';
+
+// Somewhere within the <Sidebar>
+<SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />;
+```
 
 This is all that is needed for the frontend part of the Scaffolder plugin to
 work!
@@ -81,45 +85,47 @@ following contents to get you up and running quickly.
 import {
   CookieCutter,
   createRouter,
-  FilePreparer,
-  GithubPreparer,
   Preparers,
-  GithubPublisher,
+  Publishers,
   CreateReactAppTemplater,
   Templaters,
 } from '@backstage/plugin-scaffolder-backend';
-import { Octokit } from '@octokit/rest';
+import { SingleHostDiscovery } from '@backstage/backend-common';
 import type { PluginEnvironment } from '../types';
 import Docker from 'dockerode';
+import { CatalogClient } from '@backstage/catalog-client';
 
-export default async function createPlugin({ logger }: PluginEnvironment) {
+export default async function createPlugin({
+  logger,
+  config,
+  database,
+  reader,
+}: PluginEnvironment) {
   const cookiecutterTemplater = new CookieCutter();
   const craTemplater = new CreateReactAppTemplater();
   const templaters = new Templaters();
 
-  // Register default templaters
   templaters.register('cookiecutter', cookiecutterTemplater);
   templaters.register('cra', craTemplater);
 
-  const filePreparer = new FilePreparer();
-  const githubPreparer = new GithubPreparer();
-  const preparers = new Preparers();
-
-  // Register default preparers
-  preparers.register('file', filePreparer);
-  preparers.register('github', githubPreparer);
-
-  // Create GitHub client with your access token from environment variables
-  const githubClient = new Octokit({ auth: process.env.GITHUB_ACCESS_TOKEN });
-  const publisher = new GithubPublisher({ client: githubClient });
+  const preparers = await Preparers.fromConfig(config, { logger });
+  const publishers = await Publishers.fromConfig(config, { logger });
 
   const dockerClient = new Docker();
+
+  const discovery = SingleHostDiscovery.fromConfig(config);
+  const catalogClient = new CatalogClient({ discoveryApi: discovery });
+
   return await createRouter({
     preparers,
     templaters,
-    publisher,
+    publishers,
     logger,
+    config,
     dockerClient,
+    database,
+    catalogClient,
+    reader,
   });
 }
 ```
@@ -132,10 +138,11 @@ import scaffolder from './plugins/scaffolder';
 
 const scaffolderEnv = useHotMemoize(module, () => createEnv('scaffolder'));
 
-const service = createServiceBuilder(module)
-  .loadConfig(configReader)
-  /** several different routers */
-  .addRouter('/scaffolder', await scaffolder(scaffolderEnv));
+const apiRouter = Router();
+/* several router .use calls */
+
+/* add this line */
+apiRouter.use('/scaffolder', await scaffolder(scaffolderEnv));
 ```
 
 ### Adding Templates
@@ -154,31 +161,105 @@ our example templates through static configuration. Add the following to the
 catalog:
   locations:
     # Backstage Example Templates
-    - type: github
-      target: https://github.com/spotify/backstage/blob/master/plugins/scaffolder-backend/sample-templates/react-ssr-template/template.yaml
-    - type: github
-      target: https://github.com/spotify/backstage/blob/master/plugins/scaffolder-backend/sample-templates/springboot-grpc-template/template.yaml
-    - type: github
-      target: https://github.com/spotify/backstage/blob/master/plugins/scaffolder-backend/sample-templates/create-react-app/template.yaml
-    - type: github
+    - type: url
+      target: https://github.com/backstage/backstage/blob/master/plugins/scaffolder-backend/sample-templates/react-ssr-template/template.yaml
+    - type: url
+      target: https://github.com/backstage/backstage/blob/master/plugins/scaffolder-backend/sample-templates/springboot-grpc-template/template.yaml
+    - type: url
+      target: https://github.com/backstage/backstage/blob/master/plugins/scaffolder-backend/sample-templates/create-react-app/template.yaml
+    - type: url
       target: https://github.com/spotify/cookiecutter-golang/blob/master/template.yaml
 ```
 
-### Runtime Dependencies
+### Runtime Dependencies / Configuration
 
-For the scaffolder backend plugin to function, it needs a GitHub access token,
-and access to a running Docker daemon. You can create a GitHub access token
-[here](https://github.com/settings/tokens/new), select `repo` scope only. Full
-docs on creating private GitHub access tokens is available
-[here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).
-Note that the need for private GitHub access tokens will be replaced with GitHub
-Apps integration further down the line.
+For the scaffolder backend plugin to function, you'll need to setup the
+integrations config in your `app-config.yaml`.
 
-> **Right now it is only possible to scaffold repositories inside GitHub
-> organizations, and not under personal accounts.**
+You can find help for different providers below.
 
-The GitHub access token is passed along using the `GITHUB_ACCESS_TOKEN`
-environment variable.
+> Note: Some of this configuration may already be set up as part of your
+> `app-config.yaml`. We're moving away from the duplicated config for
+> authentication in the `scaffolder` section and using `integrations` instead.
+
+#### GitHub
+
+The GitHub access token is retrieved from environment variables via the config.
+The config file needs to specify what environment variable the token is
+retrieved from. Your config should have the following objects.
+
+You can configure who can see the new repositories that the scaffolder creates
+by specifying `visibility` option. Valid options are `public`, `private` and
+`internal`. The `internal` option is for GitHub Enterprise clients, which means
+public within the enterprise.
+
+```yaml
+integrations:
+  github:
+    - host: github.com
+      token:
+        $env: GITHUB_TOKEN
+
+scaffolder:
+  github:
+    visibility: public # or 'internal' or 'private'
+```
+
+#### GitLab
+
+For GitLab, we currently support the configuration of the GitLab publisher and
+allows to configure the private access token and the base URL of a GitLab
+instance:
+
+```yaml
+integrations:
+  gitlab:
+    - host: gitlab.com
+      token:
+        $env: GITLAB_TOKEN
+```
+
+#### BitBucket
+
+For Bitbucket there are two authentication methods supported. Either `token` or
+a combination of `appPassword` and `username`. It looks like either of the
+following:
+
+```yaml
+integrations:
+  bitbucket:
+    - host: bitbucket.org
+      token:
+        $env: BITBUCKET_TOKEN
+```
+
+or
+
+```yaml
+integrations:
+  bitbucket:
+    - host: bitbucket.org
+      appPassword:
+        $env: BITBUCKET_APP_PASSWORD
+      username:
+        $env: BITBUCKET_USERNAME
+```
+
+#### Azure DevOps
+
+For Azure DevOps we support both the preparer and publisher stage with the
+configuration of a private access token (PAT). For the publisher it's also
+required to define the base URL for the client to connect to the service. This
+will hopefully support on-prem installations as well but that has not been
+verified.
+
+```yaml
+integrations:
+  azure:
+    - host: dev.azure.com
+      token:
+        $env: AZURE_TOKEN
+```
 
 ### Running the Backend
 
@@ -187,7 +268,7 @@ backend with the new configuration:
 
 ```bash
 cd packages/backend
-GITHUB_ACCESS_TOKEN=<token> yarn start
+GITHUB_TOKEN=<token> yarn start
 ```
 
 If you've also set up the frontend plugin, so you should be ready to go browse

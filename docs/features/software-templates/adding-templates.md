@@ -1,51 +1,83 @@
 ---
 id: adding-templates
 title: Adding your own Templates
+description: Documentation on Adding your own Templates
 ---
 
-Templates are stored in the **Service Catalog** under a kind `Template`. The
-minimum that the a template skeleton needs is a `template.yaml` but it would be
-good to also have some files in there that can be templated in.
+Templates are stored in the **Software Catalog** under a kind `Template`. The
+minimum that is needed to define a template is a `template.yaml` file, but it
+would be good to also have some files in there that can be templated in.
 
 A simple `template.yaml` definition might look something like this:
 
 ```yaml
-apiVersion: backstage.io/v1alpha1
+apiVersion: backstage.io/v1beta2
 kind: Template
+# some metadata about the template itself
 metadata:
-  # unique name per namespace for the template
-  name: react-ssr-template
-  # title of the template
-  title: React SSR Template
-  # a description of the template
-  description:
-    Next.js application skeleton for creating isomorphic web applications.
-  # some tags to display in the frontend
-  tags:
-    - Recommended
-    - React
+  name: v1beta2-demo
+  title: Test Action template
+  description: scaffolder v1beta2 template demo
 spec:
-  # which templater key to use in the templaters builder
-  templater: cookiecutter
-  # what does this template create
-  type: website
-  # if the template is not in the current directory where this definition is kept then specfiy
-  path: './template'
-  # the schema for the form which is displayed in the frontend.
-  # should follow JSON schema for forms: https://jsonforms.io/
-  schema:
-    required:
-      - component_id
-      - description
-    properties:
-      component_id:
-        title: Name
-        type: string
-        description: Unique name of the component
-      description:
-        title: Description
-        type: string
-        description: Description of the component
+  owner: backstage/techdocs-core
+  type: service
+
+  # these are the steps which are rendered in the frontend with the form input
+  parameters:
+    - title: Fill in some steps
+      required:
+        - name
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the component
+          ui:autofocus: true
+          ui:options:
+            rows: 5
+    - title: Choose a location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+  # here's the steps that are executed in series in the scaffolder backend
+  steps:
+    - id: fetch-base
+      name: Fetch Base
+      action: fetch:cookiecutter
+      input:
+        url: ./template
+        values:
+          name: '{{ parameters.name }}'
+
+    - id: fetch-docs
+      name: Fetch Docs
+      action: fetch:plain
+      input:
+        targetPath: ./community
+        url: https://github.com/backstage/community/tree/main/backstage-community-sessions
+
+    - id: publish
+      name: Publish
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: 'This is {{ parameters.name }}'
+        repoUrl: '{{ parameters.repoUrl }}'
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: '{{ steps.publish.output.repoContentsUrl }}'
+        catalogInfoPath: '/catalog-info.yaml'
 ```
 
 [Template Entity](../software-catalog/descriptor-format.md#kind-template)
@@ -54,53 +86,21 @@ contains more information about the required fields.
 Once we have a `template.yaml` ready, we can then add it to the service catalog
 for use by the scaffolder.
 
-Currently the catalog supports loading definitions from GitHub + Local Files. To
-load from other places, not only will there need to be another preparer, but the
-support to load the location will also need to be added to the Catalog.
+You can add the template files to the catalog through
+[static location configuration](../software-catalog/configuration.md#static-location-configuration),
+for example:
 
-For loading from a file the following command should work when the backend is
-running:
-
-```sh
-curl \
-  --location \
-  --request POST 'localhost:7000/catalog/locations' \
-  --header 'Content-Type: application/json' \
-  --data-raw "{\"type\": \"file\", \"target\": \"${YOUR PATH HERE}/template.yaml\"}"
+```yaml
+catalog:
+  locations:
+    - type: url
+      target: https://github.com/spotify/cookiecutter-golang/blob/master/template.yaml
+      rules:
+        - allow: [Template]
 ```
 
-If loading from a git location, you can run the following
+Or you can add the template using the `catalog-import` plugin, which unless
+configured differently should be running on `/catalog-import`.
 
-```sh
-curl \
-  --location \
-  --request POST 'localhost:7000/catalog/locations' \
-  --header 'Content-Type: application/json' \
-  --data-raw "{\"type\": \"github\", \"target\": \"https://${YOUR GITHUB REPO}blob/master/${PATH TO FOLDER}/template.yaml\"}"
-```
-
-This should then have added the catalog, and also should now be listed under the
-create page at http://localhost:3000/create.
-
-Alternatively, if you want to get setup with some mock templates that are
-already provided for you, you can run the following to load those templates:
-
-```
-yarn lerna run mock-data
-```
-
-The `type` field which is chosen in the request to add the `template.yaml` to
-the Service Catalog here, will be come the `PreparerKey` which will be used to
-select the `Preparer` when creating a job.
-
-### Adding form values in the Scaffolder Wizard
-
-The `spec.schema` property in the
-[Template Entity](../software-catalog/descriptor-format.md#kind-template) is a
-`yaml` version of the JSON Form Schema standard.
-
-Here you can define the key/values and then the wizard will convert this to a
-form for the user to fill in when your template is selected.
-
-You can find out much more about the standard and how to use it here:
-https://jsonforms.io
+For information about writing your own templates, you can check out the docs
+[here](./writing-templates.md)

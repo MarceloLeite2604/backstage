@@ -15,7 +15,8 @@
  */
 
 import lodash from 'lodash';
-import { EntityPolicy } from '../../types';
+import { EntityPolicy } from './types';
+import { ENTITY_DEFAULT_NAMESPACE } from '../constants';
 import { Entity } from '../Entity';
 
 /**
@@ -24,7 +25,7 @@ import { Entity } from '../Entity';
 export class DefaultNamespaceEntityPolicy implements EntityPolicy {
   private readonly namespace: string;
 
-  constructor(namespace: string = 'default') {
+  constructor(namespace: string = ENTITY_DEFAULT_NAMESPACE) {
     this.namespace = namespace;
   }
 

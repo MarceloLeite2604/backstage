@@ -30,10 +30,12 @@ export type AppConfig = {
 };
 
 export type Config = {
+  has(key: string): boolean;
+
   keys(): string[];
 
-  get(key: string): JsonValue;
-  getOptional(key: string): JsonValue | undefined;
+  get<T = JsonValue>(key?: string): T;
+  getOptional<T = JsonValue>(key?: string): T | undefined;
 
   getConfig(key: string): Config;
   getOptionalConfig(key: string): Config | undefined;

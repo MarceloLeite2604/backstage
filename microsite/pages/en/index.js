@@ -11,6 +11,7 @@ const Block = Components.Block;
 const ActionBlock = Components.ActionBlock;
 const Breakpoint = Components.Breakpoint;
 const BulletLine = Components.BulletLine;
+const Banner = Components.Banner;
 
 class Index extends React.Component {
   render() {
@@ -27,11 +28,11 @@ class Index extends React.Component {
               </Block.Title>
               <Block.Paragraph>
                 Powered by a centralized service catalog, Backstage restores
-                order to your infrastructure. So your product teams can ship
-                high-quality code quickly — without compromising autonomy.
+                order to your infrastructure and enables your product teams to
+                ship high-quality code quickly — without compromising autonomy.
               </Block.Paragraph>
               <Block.LinkButton
-                href={'https://github.com/spotify/backstage#getting-started'}
+                href={'https://github.com/backstage/backstage#getting-started'}
               >
                 GitHub
               </Block.LinkButton>
@@ -52,6 +53,15 @@ class Index extends React.Component {
             </Block.Graphics>
           </Block.Container>
         </Block>
+
+        <Banner.Container>
+          <Banner.Dismissable storageKey="k8s-launch">
+            🎉 New feature: Kubernetes for service owners.{' '}
+            <a href="https://backstage.io/blog/2021/01/12/new-backstage-feature-kubernetes-for-service-owners">
+              Learn more.
+            </a>
+          </Banner.Dismissable>
+        </Banner.Container>
 
         <Block small className="stripe-top bg-black">
           <Block.Container wrapped>
@@ -282,7 +292,7 @@ class Index extends React.Component {
             Build your own software templates
           </ActionBlock.Title>
           <ActionBlock.Link
-            href={`https://github.com/spotify/backstage/blob/master/docs/features/software-templates/extending/index.md`}
+            href={`https://github.com/backstage/backstage/blob/master/docs/features/software-templates/extending/index.md`}
           >
             Contribute
           </ActionBlock.Link>
@@ -296,9 +306,7 @@ class Index extends React.Component {
                 src={`${baseUrl}animations/backstage-techdocs-icon-1.gif`}
               />
 
-              <Block.Subtitle>
-                Backstage TechDocs <span>(Coming Soon)</span>
-              </Block.Subtitle>
+              <Block.Subtitle>Backstage TechDocs</Block.Subtitle>
               <Block.Title small>Docs like code</Block.Title>
             </Block.TextBox>
             <Breakpoint
@@ -373,19 +381,77 @@ class Index extends React.Component {
         </Block>
 
         <ActionBlock className="stripe bg-teal">
-          <ActionBlock.Title>Subscribe to our newsletter</ActionBlock.Title>
-          <ActionBlock.Subtitle>
-            TechDocs is our most used feature at Spotify. Be the first to know
-            when{' '}
-            <a href="https://github.com/spotify/backstage/projects/5">
-              the open source version
-            </a>{' '}
-            ships.
-          </ActionBlock.Subtitle>
+          <ActionBlock.Title>Learn more about TechDocs</ActionBlock.Title>
           <ActionBlock.Link
-            href={`https://mailchi.mp/spotify/backstage-community`}
+            href={`https://backstage.io/docs/features/techdocs/techdocs-overview`}
           >
-            Subscribe
+            Docs
+          </ActionBlock.Link>
+        </ActionBlock>
+
+        <Block className="stripe-top bg-teal-bottom" wrapped>
+          <Block.Container wrapped>
+            <Block.TextBox wide>
+              <img
+                className="Block__GIF"
+                src={`${baseUrl}animations/backstage-kubernetes-icon-1.gif`}
+              />
+
+              <Block.Subtitle>Backstage Kubernetes</Block.Subtitle>
+              <Block.Title small>
+                Manage your services, not clusters
+              </Block.Title>
+            </Block.TextBox>
+
+            <Block.TextBox small>
+              <BulletLine />
+              <Block.SmallTitle small>
+                Kubernetes made just for service owners
+              </Block.SmallTitle>
+              <Block.Paragraph>
+                Backstage features the first Kubernetes monitoring tool designed
+                around the needs of service owners, not cluster admins
+              </Block.Paragraph>
+            </Block.TextBox>
+
+            <Block.TextBox small>
+              <BulletLine />
+              <Block.SmallTitle small>
+                Your service at a glance
+              </Block.SmallTitle>
+              <Block.Paragraph>
+                Get all your service's deployments in one, aggregated view — no
+                more digging through cluster logs in a CLI, no more combing
+                through lists of services you don't own
+              </Block.Paragraph>
+            </Block.TextBox>
+
+            <Block.TextBox small>
+              <BulletLine />
+              <Block.SmallTitle small>Pick a cloud, any cloud</Block.SmallTitle>
+              <Block.Paragraph>
+                Since Backstage uses the Kubernetes API, it's cloud agnostic —
+                so it works no matter which cloud provide or managed Kubernetes
+                service you use, and even works in multi-cloud orgs
+              </Block.Paragraph>
+            </Block.TextBox>
+
+            <Block.TextBox small>
+              <BulletLine />
+              <Block.SmallTitle small>Any K8s, one UI</Block.SmallTitle>
+              <Block.Paragraph>
+                Now you don't have to switch dashboards when you move from local
+                testing to production, or from one cloud provider to another
+              </Block.Paragraph>
+            </Block.TextBox>
+          </Block.Container>
+        </Block>
+        <ActionBlock className="stripe bg-teal">
+          <ActionBlock.Title>Learn more about the K8s plugin</ActionBlock.Title>
+          <ActionBlock.Link
+            href={`https://backstage.io/blog/2021/01/12/new-backstage-feature-kubernetes-for-service-owners`}
+          >
+            Read
           </ActionBlock.Link>
         </ActionBlock>
 
@@ -455,12 +521,8 @@ class Index extends React.Component {
                 Share with the community
               </Block.SmallTitle>
               <Block.Paragraph>
-                Building{' '}
-                <a href="https://github.com/spotify/backstage/blob/master/docs/FAQ.md#how-do-i-find-out-if-a-plugin-already-exists">
-                  open source plugins
-                </a>{' '}
-                contributes to the entire Backstage ecosystem, which benefits
-                everyone
+                Building <a href="/plugins">open source plugins</a> contributes
+                to the entire Backstage ecosystem, which benefits everyone
               </Block.Paragraph>
             </Block.TextBox>
 
@@ -472,10 +534,23 @@ class Index extends React.Component {
 
         <ActionBlock className="stripe-top bg-teal">
           <ActionBlock.Title>Build a plugin</ActionBlock.Title>
-          <ActionBlock.Link href="https://github.com/spotify/backstage/blob/master/docs/plugins/create-a-plugin.md">
+          <ActionBlock.Link href="/docs/plugins/create-a-plugin">
             Contribute
           </ActionBlock.Link>
         </ActionBlock>
+
+        <Block small className="bg-black-grey cncf-block">
+          <Block.Container center>
+            <Block.SmallTitle small>
+              Backstage is a{' '}
+              <a href="https://www.cncf.io">
+                Cloud Native Computing Foundation
+              </a>{' '}
+              sandbox project
+              <div className="cncf-logo" />
+            </Block.SmallTitle>
+          </Block.Container>
+        </Block>
       </main>
     );
   }

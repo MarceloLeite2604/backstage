@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
+import React from 'react';
 import { createDevApp } from '@backstage/dev-utils';
-import { plugin } from '../src/plugin';
-import { techRadarApiRef, TechRadar } from '../src';
+import { techRadarPlugin, TechRadarPage } from '../src';
 
 createDevApp()
-  .registerPlugin(plugin)
-  .registerApiFactory({
-    implements: techRadarApiRef,
-    deps: {},
-    factory: () => new TechRadar({ width: 1500, height: 800 }),
+  .registerPlugin(techRadarPlugin)
+  .addPage({
+    title: 'Tech Radar',
+    element: <TechRadarPage width={1280} height={720} />,
   })
   .render();

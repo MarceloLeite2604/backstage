@@ -17,25 +17,26 @@
 import express from 'express';
 import passport from 'passport';
 import { Strategy as OAuth2Strategy } from 'passport-oauth2';
-import { Logger } from 'winston';
-import { TokenIssuer } from '../../identity';
-import { OAuthProvider } from '../../lib/OAuthProvider';
+import {
+  OAuthAdapter,
+  OAuthProviderOptions,
+  OAuthHandlers,
+  OAuthResponse,
+  OAuthEnvironmentHandler,
+  OAuthStartRequest,
+  encodeState,
+  OAuthRefreshRequest,
+  OAuthResult,
+} from '../../lib/oauth';
 import {
   executeFetchUserProfileStrategy,
   executeFrameHandlerStrategy,
   executeRedirectStrategy,
   executeRefreshTokenStrategy,
   makeProfileInfo,
-} from '../../lib/PassportStrategyHelper';
-import {
-  AuthProviderConfig,
-  OAuthProviderOptions,
-  OAuthProviderHandlers,
-  OAuthResponse,
   PassportDoneCallback,
-  RedirectInfo,
-} from '../types';
-import { Config } from '@backstage/config';
+} from '../../lib/passport';
+import { RedirectInfo, AuthProviderFactory } from '../types';
 
 type PrivateInfo = {
   refreshToken: string;
@@ -44,9 +45,10 @@ type PrivateInfo = {
 export type OAuth2AuthProviderOptions = OAuthProviderOptions & {
   authorizationUrl: string;
   tokenUrl: string;
+  scope?: string;
 };
 
-export class OAuth2AuthProvider implements OAuthProviderHandlers {
+export class OAuth2AuthProvider implements OAuthHandlers {
   private readonly _strategy: OAuth2Strategy;
 
   constructor(options: OAuth2AuthProviderOptions) {
@@ -58,25 +60,22 @@ export class OAuth2AuthProvider implements OAuthProviderHandlers {
         authorizationURL: options.authorizationUrl,
         tokenURL: options.tokenUrl,
         passReqToCallback: false as true,
+        scope: options.scope,
       },
       (
         accessToken: any,
         refreshToken: any,
         params: any,
-        rawProfile: passport.Profile,
-        done: PassportDoneCallback<OAuthResponse, PrivateInfo>,
+        fullProfile: passport.Profile,
+        done: PassportDoneCallback<OAuthResult, PrivateInfo>,
       ) => {
-        const profile = makeProfileInfo(rawProfile, params.id_token);
         done(
           undefined,
           {
-            providerInfo: {
-              idToken: params.id_token,
-              accessToken,
-              scope: params.scope,
-              expiresInSeconds: params.expires_in,
-            },
-            profile,
+            fullProfile,
+            accessToken,
+            refreshToken,
+            params,
           },
           {
             refreshToken,
@@ -86,48 +85,61 @@ export class OAuth2AuthProvider implements OAuthProviderHandlers {
     );
   }
 
-  async start(
-    req: express.Request,
-    options: Record<string, string>,
-  ): Promise<RedirectInfo> {
-    const providerOptions = {
-      ...options,
+  async start(req: OAuthStartRequest): Promise<RedirectInfo> {
+    return await executeRedirectStrategy(req, this._strategy, {
       accessType: 'offline',
       prompt: 'consent',
-    };
-    return await executeRedirectStrategy(req, this._strategy, providerOptions);
+      scope: req.scope,
+      state: encodeState(req.state),
+    });
   }
 
   async handler(
     req: express.Request,
   ): Promise<{ response: OAuthResponse; refreshToken: string }> {
-    const { response, privateInfo } = await executeFrameHandlerStrategy<
-      OAuthResponse,
+    const { result, privateInfo } = await executeFrameHandlerStrategy<
+      OAuthResult,
       PrivateInfo
     >(req, this._strategy);
 
+    const profile = makeProfileInfo(result.fullProfile, result.params.id_token);
+
     return {
-      response: await this.populateIdentity(response),
+      response: await this.populateIdentity({
+        profile,
+        providerInfo: {
+          idToken: result.params.id_token,
+          accessToken: result.accessToken,
+          scope: result.params.scope,
+          expiresInSeconds: result.params.expires_in,
+        },
+      }),
       refreshToken: privateInfo.refreshToken,
     };
   }
 
-  async refresh(refreshToken: string, scope: string): Promise<OAuthResponse> {
-    const { accessToken, params } = await executeRefreshTokenStrategy(
+  async refresh(req: OAuthRefreshRequest): Promise<OAuthResponse> {
+    const refreshTokenResponse = await executeRefreshTokenStrategy(
       this._strategy,
-      refreshToken,
-      scope,
+      req.refreshToken,
+      req.scope,
     );
+    const {
+      accessToken,
+      params,
+      refreshToken: updatedRefreshToken,
+    } = refreshTokenResponse;
 
-    const profile = await executeFetchUserProfileStrategy(
+    const rawProfile = await executeFetchUserProfileStrategy(
       this._strategy,
       accessToken,
-      params.id_token,
     );
+    const profile = makeProfileInfo(rawProfile, params.id_token);
 
     return this.populateIdentity({
       providerInfo: {
         accessToken,
+        refreshToken: updatedRefreshToken,
         idToken: params.id_token,
         expiresInSeconds: params.expires_in,
         scope: params.scope,
@@ -144,40 +156,41 @@ export class OAuth2AuthProvider implements OAuthProviderHandlers {
     const { profile } = response;
 
     if (!profile.email) {
-      throw new Error('Profile does not contain a profile');
+      throw new Error('Profile does not contain an email');
     }
-
     const id = profile.email.split('@')[0];
 
     return { ...response, backstageIdentity: { id } };
   }
 }
 
-export function createOAuth2Provider(
-  config: AuthProviderConfig,
-  _: string,
-  envConfig: Config,
-  _logger: Logger,
-  tokenIssuer: TokenIssuer,
-) {
-  const providerId = 'oauth2';
-  const clientId = envConfig.getString('clientId');
-  const clientSecret = envConfig.getString('clientSecret');
-  const callbackUrl = `${config.baseUrl}/${providerId}/handler/frame`;
-  const authorizationUrl = envConfig.getString('authorizationUrl');
-  const tokenUrl = envConfig.getString('tokenUrl');
+export type OAuth2ProviderOptions = {};
 
-  const provider = new OAuth2AuthProvider({
-    clientId,
-    clientSecret,
-    callbackUrl,
-    authorizationUrl,
-    tokenUrl,
-  });
+export const createOAuth2Provider = (
+  _options?: OAuth2ProviderOptions,
+): AuthProviderFactory => {
+  return ({ providerId, globalConfig, config, tokenIssuer }) =>
+    OAuthEnvironmentHandler.mapConfig(config, envConfig => {
+      const clientId = envConfig.getString('clientId');
+      const clientSecret = envConfig.getString('clientSecret');
+      const callbackUrl = `${globalConfig.baseUrl}/${providerId}/handler/frame`;
+      const authorizationUrl = envConfig.getString('authorizationUrl');
+      const tokenUrl = envConfig.getString('tokenUrl');
+      const scope = envConfig.getOptionalString('scope');
 
-  return OAuthProvider.fromConfig(config, provider, {
-    disableRefresh: false,
-    providerId,
-    tokenIssuer,
-  });
-}
+      const provider = new OAuth2AuthProvider({
+        clientId,
+        clientSecret,
+        callbackUrl,
+        authorizationUrl,
+        tokenUrl,
+        scope,
+      });
+
+      return OAuthAdapter.fromConfig(globalConfig, provider, {
+        disableRefresh: false,
+        providerId,
+        tokenIssuer,
+      });
+    });
+};

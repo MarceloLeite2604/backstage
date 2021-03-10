@@ -14,15 +14,40 @@
  * limitations under the License.
  */
 
-import { createPlugin } from '@backstage/core';
-import { RollbarPage } from './components/RollbarPage/RollbarPage';
-import { RollbarProjectPage } from './components/RollbarProjectPage/RollbarProjectPage';
-import { rootRoute, rootProjectRoute } from './routes';
+import {
+  createApiFactory,
+  createPlugin,
+  createRoutableExtension,
+  createRouteRef,
+  discoveryApiRef,
+  identityApiRef,
+} from '@backstage/core';
+import { rollbarApiRef } from './api/RollbarApi';
+import { RollbarClient } from './api/RollbarClient';
 
-export const plugin = createPlugin({
+export const rootRouteRef = createRouteRef({
+  path: '',
+  title: 'Rollbar',
+});
+
+export const rollbarPlugin = createPlugin({
   id: 'rollbar',
-  register({ router }) {
-    router.addRoute(rootRoute, RollbarPage);
-    router.addRoute(rootProjectRoute, RollbarProjectPage);
+  apis: [
+    createApiFactory({
+      api: rollbarApiRef,
+      deps: { discoveryApi: discoveryApiRef, identityApi: identityApiRef },
+      factory: ({ discoveryApi, identityApi }) =>
+        new RollbarClient({ discoveryApi, identityApi }),
+    }),
+  ],
+  routes: {
+    entityContent: rootRouteRef,
   },
 });
+
+export const EntityRollbarContent = rollbarPlugin.provide(
+  createRoutableExtension({
+    component: () => import('./components/Router').then(m => m.Router),
+    mountPoint: rootRouteRef,
+  }),
+);

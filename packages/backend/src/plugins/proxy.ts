@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// @ts-ignore
+
 import { createRouter } from '@backstage/plugin-proxy-backend';
+import { Router } from 'express';
 import { PluginEnvironment } from '../types';
 
 export default async function createPlugin({
   logger,
   config,
-}: PluginEnvironment) {
-  return await createRouter({ logger, config });
+  discovery,
+}: PluginEnvironment): Promise<Router> {
+  return await createRouter({ logger, config, discovery });
 }

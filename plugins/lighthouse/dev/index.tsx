@@ -15,13 +15,13 @@
  */
 
 import { createDevApp } from '@backstage/dev-utils';
-import { plugin } from '../src/plugin';
+import { lighthousePlugin } from '../src/plugin';
 import { lighthouseApiRef, LighthouseRestApi } from '../src';
 
 createDevApp()
-  .registerPlugin(plugin)
-  .registerApiFactory({
-    implements: lighthouseApiRef,
+  .registerPlugin(lighthousePlugin)
+  .registerApi({
+    api: lighthouseApiRef,
     deps: {},
     factory: () => new LighthouseRestApi('http://localhost:3003'),
   })

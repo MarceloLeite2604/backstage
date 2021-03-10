@@ -14,9 +14,27 @@
  * limitations under the License.
  */
 
-export { entityMetaGeneratedFields } from './Entity';
-export type { Entity, EntityMeta } from './Entity';
+export {
+  ENTITY_DEFAULT_NAMESPACE,
+  ENTITY_META_GENERATED_FIELDS,
+  VIEW_URL_ANNOTATION,
+  EDIT_URL_ANNOTATION,
+} from './constants';
+export type {
+  Entity,
+  EntityLink,
+  EntityMeta,
+  EntityRelation,
+  EntityRelationSpec,
+} from './Entity';
 export * from './policies';
+export {
+  compareEntityToRef,
+  getEntityName,
+  parseEntityName,
+  parseEntityRef,
+  serializeEntityRef,
+} from './ref';
 export {
   entityHasChanges,
   generateEntityEtag,

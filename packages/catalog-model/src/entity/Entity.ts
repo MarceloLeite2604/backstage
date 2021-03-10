@@ -15,6 +15,7 @@
  */
 
 import { JsonObject } from '@backstage/config';
+import { EntityName } from '../types';
 
 /**
  * The format envelope that's common to all versions/kinds of entity.
@@ -42,6 +43,11 @@ export type Entity = {
    * The specification data describing the entity itself.
    */
   spec?: JsonObject;
+
+  /**
+   * The relations that this entity has with other entities.
+   */
+  relations?: EntityRelation[];
 };
 
 /**
@@ -87,7 +93,7 @@ export type EntityMeta = JsonObject & {
   /**
    * The name of the entity.
    *
-   * Must be uniqe within the catalog at any given point in time, for any
+   * Must be unique within the catalog at any given point in time, for any
    * given namespace + kind pair.
    */
   name: string;
@@ -119,9 +125,64 @@ export type EntityMeta = JsonObject & {
    * various ways.
    */
   tags?: string[];
+
+  /**
+   * A list of external hyperlinks related to the entity.
+   */
+  links?: EntityLink[];
 };
 
 /**
- * The keys of EntityMeta that are auto-generated.
+ * A relation of a specific type to another entity in the catalog.
  */
-export const entityMetaGeneratedFields = ['uid', 'etag', 'generation'] as const;
+export type EntityRelation = {
+  /**
+   * The type of the relation.
+   */
+  type: string;
+
+  /**
+   * The target entity of this relation.
+   */
+  target: EntityName;
+};
+
+/**
+ * Holds the relation data for entities.
+ */
+export type EntityRelationSpec = {
+  /**
+   * The source entity of this relation.
+   */
+  source: EntityName;
+
+  /**
+   * The type of the relation.
+   */
+  type: string;
+
+  /**
+   * The target entity of this relation.
+   */
+  target: EntityName;
+};
+
+/**
+ * A link to external information that is related to the entity.
+ */
+export type EntityLink = {
+  /**
+   * The url to the external site, document, etc.
+   */
+  url: string;
+
+  /**
+   * An optional descriptive title for the link.
+   */
+  title?: string;
+
+  /**
+   * An optional semantic key that represents a visual icon.
+   */
+  icon?: string;
+};

@@ -14,25 +14,40 @@
  * limitations under the License.
  */
 
-import { TemplateEntityV1alpha1 } from '@backstage/catalog-model';
+import { EntityMeta, TemplateEntityV1alpha1 } from '@backstage/catalog-model';
 import {
+  configApiRef,
   Content,
   ContentHeader,
-  errorApiRef,
   Header,
+  ItemCardGrid,
   Lifecycle,
   Page,
-  pageTheme,
   Progress,
   SupportButton,
   useApi,
+  WarningPanel,
 } from '@backstage/core';
-import { catalogApiRef } from '@backstage/plugin-catalog';
-import { Button, Grid, Typography, Link } from '@material-ui/core';
-import React, { useEffect } from 'react';
+import { useStarredEntities } from '@backstage/plugin-catalog-react';
+import { Button, Link, makeStyles, Typography } from '@material-ui/core';
+import StarIcon from '@material-ui/icons/Star';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import useStaleWhileRevalidate from 'swr';
+import { EntityFilterGroupsProvider, useFilteredEntities } from '../../filter';
+import { ResultsFilter } from '../ResultsFilter/ResultsFilter';
+import { ScaffolderFilter } from '../ScaffolderFilter';
+import { ButtonGroup } from '../ScaffolderFilter/ScaffolderFilter';
+import SearchToolbar from '../SearchToolbar/SearchToolbar';
 import { TemplateCard, TemplateCardProps } from '../TemplateCard';
+
+const useStyles = makeStyles(theme => ({
+  contentWrapper: {
+    display: 'grid',
+    gridTemplateAreas: "'filters' 'grid'",
+    gridTemplateColumns: '250px 1fr',
+    gridColumnGap: theme.spacing(2),
+  },
+}));
 
 const getTemplateCardProps = (
   template: TemplateEntityV1alpha1,
@@ -46,43 +61,84 @@ const getTemplateCardProps = (
     tags: (template.metadata?.tags as string[]) ?? [],
   };
 };
-export const ScaffolderPage: React.FC<{}> = () => {
-  const catalogApi = useApi(catalogApiRef);
-  const errorApi = useApi(errorApiRef);
 
-  const { data: templates, isValidating, error } = useStaleWhileRevalidate(
-    'templates/all',
-    async () =>
-      catalogApi.getEntities({ kind: 'Template' }) as Promise<
-        TemplateEntityV1alpha1[]
-      >,
+export const ScaffolderPageContents = () => {
+  const styles = useStyles();
+  const {
+    loading,
+    error,
+    filteredEntities,
+    availableCategories,
+  } = useFilteredEntities();
+  const configApi = useApi(configApiRef);
+  const orgName = configApi.getOptionalString('organization.name') ?? 'Company';
+  const { isStarredEntity } = useStarredEntities();
+  const filterGroups = useMemo<ButtonGroup[]>(
+    () => [
+      {
+        name: orgName,
+        items: [
+          {
+            id: 'all',
+            label: 'All',
+            filterFn: () => true,
+          },
+        ],
+      },
+      {
+        name: 'Personal',
+        items: [
+          {
+            id: 'starred',
+            label: 'Starred',
+            icon: StarIcon,
+            filterFn: isStarredEntity,
+          },
+        ],
+      },
+    ],
+    [isStarredEntity, orgName],
+  );
+  const [search, setSearch] = useState('');
+  const [matchingEntities, setMatchingEntities] = useState(
+    [] as TemplateEntityV1alpha1[],
   );
 
+  const matchesQuery = (metadata: EntityMeta, query: string) =>
+    `${metadata.title}`.toUpperCase().includes(query) ||
+    metadata.tags?.join('').toUpperCase().indexOf(query) !== -1;
+
   useEffect(() => {
-    if (!error) return;
-    errorApi.post(error);
-  }, [error, errorApi]);
+    if (search.length === 0) {
+      return setMatchingEntities(filteredEntities);
+    }
+    return setMatchingEntities(
+      filteredEntities.filter(template =>
+        matchesQuery(template.metadata, search.toUpperCase()),
+      ),
+    );
+  }, [search, filteredEntities]);
 
   return (
-    <Page theme={pageTheme.other}>
+    <Page themeId="home">
       <Header
-        pageTitleOverride="Create a new component"
+        pageTitleOverride="Create a New Component"
         title={
           <>
-            Create a new component <Lifecycle alpha shorthand />
+            Create a New Component <Lifecycle alpha shorthand />
           </>
         }
         subtitle="Create new software components using standard templates"
       />
       <Content>
-        <ContentHeader title="Available templates">
+        <ContentHeader title="Available Templates">
           <Button
             variant="contained"
             color="primary"
             component={RouterLink}
-            to="/register-component"
+            to="/catalog-import"
           >
-            Register existing component
+            Register Existing Component
           </Button>
           <SupportButton>
             Create new software components using standard templates. Different
@@ -90,33 +146,54 @@ export const ScaffolderPage: React.FC<{}> = () => {
             documentation, ...).
           </SupportButton>
         </ContentHeader>
-        {!templates && isValidating && <Progress />}
-        {templates && !templates.length && (
-          <Typography variant="body2">
-            Shoot! Looks like you don't have any templates. Check out the
-            documentation{' '}
-            <Link href="docs/backstage/features/software-templates/adding-templates">
-              here!
-            </Link>
-          </Typography>
-        )}
-        {error && (
-          <Typography variant="body2">
-            Oops! Something went wrong loading the templates: {error.message}
-          </Typography>
-        )}
-        <Grid container>
-          {templates &&
-            templates?.length > 0 &&
-            templates.map(template => {
-              return (
-                <Grid item xs={12} sm={6} md={3}>
+
+        <div className={styles.contentWrapper}>
+          <div>
+            <SearchToolbar search={search} setSearch={setSearch} />
+            <ScaffolderFilter
+              buttonGroups={filterGroups}
+              initiallySelected="all"
+            />
+            <ResultsFilter availableCategories={availableCategories} />
+          </div>
+          <div>
+            {loading && <Progress />}
+
+            {error && (
+              <WarningPanel title="Oops! Something went wrong loading the templates">
+                {error.message}
+              </WarningPanel>
+            )}
+
+            {!error &&
+              !loading &&
+              matchingEntities &&
+              !matchingEntities.length && (
+                <Typography variant="body2">
+                  No templates found that match your filter. Learn more about{' '}
+                  <Link href="https://backstage.io/docs/features/software-templates/adding-templates">
+                    adding templates
+                  </Link>
+                  .
+                </Typography>
+              )}
+
+            <ItemCardGrid>
+              {matchingEntities &&
+                matchingEntities?.length > 0 &&
+                matchingEntities.map(template => (
                   <TemplateCard {...getTemplateCardProps(template)} />
-                </Grid>
-              );
-            })}
-        </Grid>
+                ))}
+            </ItemCardGrid>
+          </div>
+        </div>
       </Content>
     </Page>
   );
 };
+
+export const ScaffolderPage = () => (
+  <EntityFilterGroupsProvider>
+    <ScaffolderPageContents />
+  </EntityFilterGroupsProvider>
+);

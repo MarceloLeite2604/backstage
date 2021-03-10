@@ -20,26 +20,26 @@ import {
   RollbarProject,
   RollbarTopActiveItem,
 } from './types';
+import { DiscoveryApi, IdentityApi } from '@backstage/core';
 
 export class RollbarClient implements RollbarApi {
-  private apiOrigin: string;
-  private basePath: string;
+  private readonly discoveryApi: DiscoveryApi;
+  private readonly identityApi: IdentityApi;
 
-  constructor({
-    apiOrigin,
-    basePath,
-  }: {
-    apiOrigin: string;
-    basePath: string;
+  constructor(options: {
+    discoveryApi: DiscoveryApi;
+    identityApi: IdentityApi;
   }) {
-    this.apiOrigin = apiOrigin;
-    this.basePath = basePath;
+    this.discoveryApi = options.discoveryApi;
+    this.identityApi = options.identityApi;
   }
 
   async getAllProjects(): Promise<RollbarProject[]> {
-    const path = `/projects`;
+    return await this.get(`/projects`);
+  }
 
-    return await this.get(path);
+  async getProject(projectName: string): Promise<RollbarProject> {
+    return await this.get(`/projects/${projectName}`);
   }
 
   async getTopActiveItems(
@@ -47,20 +47,21 @@ export class RollbarClient implements RollbarApi {
     hours = 24,
     environment = 'production',
   ): Promise<RollbarTopActiveItem[]> {
-    const path = `/projects/${project}/top_active_items?environment=${environment}&hours=${hours}`;
-
-    return await this.get(path);
+    return await this.get(
+      `/projects/${project}/top_active_items?environment=${environment}&hours=${hours}`,
+    );
   }
 
   async getProjectItems(project: string): Promise<RollbarItemsResponse> {
-    const path = `/projects/${project}/items`;
-
-    return await this.get(path);
+    return await this.get(`/projects/${project}/items`);
   }
 
   private async get(path: string): Promise<any> {
-    const url = `${this.apiOrigin}${this.basePath}${path}`;
-    const response = await fetch(url);
+    const url = `${await this.discoveryApi.getBaseUrl('rollbar')}${path}`;
+    const idToken = await this.identityApi.getIdToken();
+    const response = await fetch(url, {
+      headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+    });
 
     if (!response.ok) {
       const payload = await response.text();

@@ -14,8 +14,19 @@
  * limitations under the License.
  */
 
-export { plugin } from './plugin';
-export * from './api/CatalogClient';
-export * from './api/types';
-export * from './routes';
-export { useEntityCompoundName } from './components/useEntityCompoundName';
+export { AboutCard } from './components/AboutCard';
+export { EntityLayout } from './components/EntityLayout';
+export { EntityPageLayout } from './components/EntityPageLayout';
+export * from './components/EntitySwitch';
+export { Router } from './components/Router';
+export {
+  CatalogEntityPage,
+  CatalogIndexPage,
+  catalogPlugin,
+  catalogPlugin as plugin,
+  EntityAboutCard,
+  EntityHasComponentsCard,
+  EntityHasSubcomponentsCard,
+  EntityHasSystemsCard,
+  EntityLinksCard,
+} from './plugin';

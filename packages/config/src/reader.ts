@@ -49,6 +49,9 @@ const errors = {
   missing(key: string) {
     return `Missing required config value at '${key}'`;
   },
+  convert(key: string, context: string, expected: string) {
+    return `Unable to convert config value for key '${key}' in '${context}' to a ${expected}`;
+  },
 };
 
 export class ConfigReader implements Config {
@@ -66,7 +69,7 @@ export class ConfigReader implements Config {
 
   constructor(
     private readonly data: JsonObject | undefined,
-    private readonly context: string = 'empty-config',
+    private readonly context: string = 'mock-config',
     private readonly fallback?: ConfigReader,
     private readonly prefix: string = '',
   ) {}
@@ -85,22 +88,22 @@ export class ConfigReader implements Config {
     return [...new Set([...localKeys, ...fallbackKeys])];
   }
 
-  get(key?: string): JsonValue {
+  get<T = JsonValue>(key?: string): T {
     const value = this.getOptional(key);
     if (value === undefined) {
       throw new Error(errors.missing(this.fullKey(key ?? '')));
     }
-    return value;
+    return value as T;
   }
 
-  getOptional(key?: string): JsonValue | undefined {
+  getOptional<T = JsonValue>(key?: string): T | undefined {
     const value = this.readValue(key);
-    const fallbackValue = this.fallback?.getOptional(key);
+    const fallbackValue = this.fallback?.getOptional<T>(key);
 
     if (value === undefined) {
       return fallbackValue;
     } else if (fallbackValue === undefined) {
-      return value;
+      return value as T;
     }
 
     // Avoid merging arrays and primitive values, since that's how merging works for other
@@ -110,7 +113,7 @@ export class ConfigReader implements Config {
       { value: cloneDeep(fallbackValue) },
       { value },
       (into, from) => (!isObject(from) || !isObject(into) ? from : undefined),
-    ).value;
+    ).value as T;
   }
 
   getConfig(key: string): ConfigReader {
@@ -183,10 +186,22 @@ export class ConfigReader implements Config {
   }
 
   getOptionalNumber(key: string): number | undefined {
-    return this.readConfigValue(
+    const value = this.readConfigValue<string | number>(
       key,
-      value => typeof value === 'number' || { expected: 'number' },
+      val =>
+        typeof val === 'number' ||
+        typeof val === 'string' || { expected: 'number' },
     );
+    if (typeof value === 'number' || value === undefined) {
+      return value;
+    }
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw new Error(
+        errors.convert(this.fullKey(key), this.context, 'number'),
+      );
+    }
+    return number;
   }
 
   getBoolean(key: string): boolean {
@@ -257,23 +272,17 @@ export class ConfigReader implements Config {
     if (value === undefined) {
       return this.fallback?.readConfigValue(key, validate);
     }
-    if (value !== undefined) {
-      const result = validate(value);
-      if (result !== true) {
-        const {
-          key: keyName = key,
-          value: theValue = value,
+    const result = validate(value);
+    if (result !== true) {
+      const { key: keyName = key, value: theValue = value, expected } = result;
+      throw new TypeError(
+        errors.type(
+          this.fullKey(keyName),
+          this.context,
+          typeOf(theValue),
           expected,
-        } = result;
-        throw new TypeError(
-          errors.type(
-            this.fullKey(keyName),
-            this.context,
-            typeOf(theValue),
-            expected,
-          ),
-        );
-      }
+        ),
+      );
     }
 
     return value as T;

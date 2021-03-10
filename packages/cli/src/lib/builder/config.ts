@@ -22,13 +22,13 @@ import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import postcss from 'rollup-plugin-postcss';
 import esbuild from 'rollup-plugin-esbuild';
-import imageFiles from 'rollup-plugin-image-files';
 import svgr from '@svgr/rollup';
 import dts from 'rollup-plugin-dts';
 import json from '@rollup/plugin-json';
 import yaml from '@rollup/plugin-yaml';
 import { RollupOptions, OutputOptions } from 'rollup';
 
+import { forwardFileImports } from './plugins';
 import { BuildOptions, Output } from './types';
 import { paths } from '../paths';
 import { svgrTemplate } from '../svgrTemplate';
@@ -36,22 +36,6 @@ import { svgrTemplate } from '../svgrTemplate';
 export const makeConfigs = async (
   options: BuildOptions,
 ): Promise<RollupOptions[]> => {
-  const typesInput = paths.resolveTargetRoot(
-    'dist',
-    relativePath(paths.targetRoot, paths.targetDir),
-    'src/index.d.ts',
-  );
-
-  const declarationsExist = await fs.pathExists(typesInput);
-  if (!declarationsExist) {
-    const path = relativePath(paths.targetDir, typesInput);
-    throw new Error(
-      `No declaration files found at ${path}, be sure to run ${chalk.bgRed.white(
-        'yarn tsc',
-      )} to generate .d.ts files before packaging`,
-    );
-  }
-
   const configs = new Array<RollupOptions>();
 
   if (options.outputs.has(Output.cjs) || options.outputs.has(Output.esm)) {
@@ -62,16 +46,18 @@ export const makeConfigs = async (
       output.push({
         dir: 'dist',
         entryFileNames: 'index.cjs.js',
-        chunkFileNames: 'cjs/[name]-[hash].js',
+        chunkFileNames: 'cjs/[name]-[hash].cjs.js',
         format: 'commonjs',
+        sourcemap: true,
       });
     }
     if (options.outputs.has(Output.esm)) {
       output.push({
         dir: 'dist',
         entryFileNames: 'index.esm.js',
-        chunkFileNames: 'esm/[name]-[hash].js',
+        chunkFileNames: 'esm/[name]-[hash].esm.js',
         format: 'module',
+        sourcemap: true,
       });
       // Assume we're building for the browser if ESM output is included
       mainFields.unshift('browser');
@@ -88,15 +74,18 @@ export const makeConfigs = async (
         }),
         resolve({ mainFields }),
         commonjs({
-          include: ['node_modules/**', '../../node_modules/**'],
-          exclude: ['**/*.stories.*', '**/*.test.*'],
+          include: /node_modules/,
+          exclude: [/\/[^/]+\.(?:stories|test)\.[^/]+$/],
         }),
         postcss(),
-        imageFiles({ exclude: '**/*.icon.svg' }),
+        forwardFileImports({
+          exclude: /\.icon\.svg$/,
+          include: [/\.svg$/, /\.png$/, /\.gif$/, /\.jpg$/, /\.jpeg$/],
+        }),
         json(),
         yaml(),
         svgr({
-          include: '**/*.icon.svg',
+          include: /\.icon\.svg$/,
           template: svgrTemplate,
         }),
         esbuild({
@@ -107,6 +96,22 @@ export const makeConfigs = async (
   }
 
   if (options.outputs.has(Output.types)) {
+    const typesInput = paths.resolveTargetRoot(
+      'dist-types',
+      relativePath(paths.targetRoot, paths.targetDir),
+      'src/index.d.ts',
+    );
+
+    const declarationsExist = await fs.pathExists(typesInput);
+    if (!declarationsExist) {
+      const path = relativePath(paths.targetDir, typesInput);
+      throw new Error(
+        `No declaration files found at ${path}, be sure to run ${chalk.bgRed.white(
+          'yarn tsc',
+        )} to generate .d.ts files before packaging`,
+      );
+    }
+
     configs.push({
       input: typesInput,
       output: {

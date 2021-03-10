@@ -14,5 +14,17 @@
  * limitations under the License.
  */
 
-export { plugin, JenkinsBuildsWidget, JenkinsLastBuildWidget } from './plugin';
+export {
+  jenkinsPlugin,
+  jenkinsPlugin as plugin,
+  EntityJenkinsContent,
+  EntityLatestJenkinsRunCard,
+} from './plugin';
+export { LatestRunCard } from './components/Cards';
+export {
+  Router,
+  isJenkinsAvailable,
+  isJenkinsAvailable as isPluginApplicableToEntity,
+} from './components/Router';
+export { JENKINS_ANNOTATION } from './constants';
 export * from './api';

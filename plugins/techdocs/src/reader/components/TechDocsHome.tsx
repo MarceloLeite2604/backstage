@@ -14,72 +14,100 @@
  * limitations under the License.
  */
 
+import {
+  Button,
+  CodeSnippet,
+  Content,
+  Header,
+  ItemCardGrid,
+  ItemCardHeader,
+  Page,
+  Progress,
+  useApi,
+  WarningPanel,
+} from '@backstage/core';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
+import { Card, CardActions, CardContent, CardMedia } from '@material-ui/core';
 import React from 'react';
+import { generatePath } from 'react-router-dom';
 import { useAsync } from 'react-use';
-import { useNavigate } from 'react-router-dom';
-import { Grid } from '@material-ui/core';
-import { ItemCard, Progress, useApi } from '@backstage/core';
-import { TechDocsPageWrapper } from './TechDocsPageWrapper';
-import { catalogApiRef } from '@backstage/plugin-catalog';
+import { rootDocsRouteRef } from '../../plugin';
 
 export const TechDocsHome = () => {
   const catalogApi = useApi(catalogApiRef);
-  const navigate = useNavigate();
 
   const { value, loading, error } = useAsync(async () => {
-    const entities = await catalogApi.getEntities();
-    return entities.filter(entity => {
+    const response = await catalogApi.getEntities();
+    return response.items.filter(entity => {
       return !!entity.metadata.annotations?.['backstage.io/techdocs-ref'];
     });
   });
 
   if (loading) {
     return (
-      <TechDocsPageWrapper
-        title="Documentation"
-        subtitle="Documentation available in Backstage"
-      >
-        <Progress />
-      </TechDocsPageWrapper>
+      <Page themeId="documentation">
+        <Header
+          title="Documentation"
+          subtitle="Documentation available in Backstage"
+        />
+        <Content>
+          <Progress />
+        </Content>
+      </Page>
     );
   }
 
   if (error) {
     return (
-      <TechDocsPageWrapper
-        title="Documentation"
-        subtitle="Documentation available in Backstage"
-      >
-        <p>{error.message}</p>
-      </TechDocsPageWrapper>
+      <Page themeId="documentation">
+        <Header
+          title="Documentation"
+          subtitle="Documentation available in Backstage"
+        />
+        <Content>
+          <WarningPanel
+            severity="error"
+            title="Could not load available documentation."
+          >
+            <CodeSnippet language="text" text={error.toString()} />
+          </WarningPanel>
+        </Content>
+      </Page>
     );
   }
 
   return (
-    <TechDocsPageWrapper
-      title="Documentation"
-      subtitle="Documentation available in Backstage"
-    >
-      <Grid container data-testid="docs-explore">
-        {value?.length
-          ? value.map((entity, index: number) => (
-              <Grid key={index} item xs={12} sm={6} md={3}>
-                <ItemCard
-                  onClick={() =>
-                    navigate(
-                      `/docs/${entity.kind}:${
-                        entity.metadata.namespace ?? ''
-                      }:${entity.metadata.name}`,
-                    )
-                  }
-                  title={entity.metadata.name}
-                  label="Read Docs"
-                  description={entity.metadata.description}
-                />
-              </Grid>
-            ))
-          : null}
-      </Grid>
-    </TechDocsPageWrapper>
+    <Page themeId="documentation">
+      <Header
+        title="Documentation"
+        subtitle="Documentation available in Backstage"
+      />
+      <Content>
+        <ItemCardGrid data-testid="docs-explore">
+          {!value?.length
+            ? null
+            : value.map((entity, index: number) => (
+                <Card key={index}>
+                  <CardMedia>
+                    <ItemCardHeader title={entity.metadata.name} />
+                  </CardMedia>
+                  <CardContent>{entity.metadata.description}</CardContent>
+                  <CardActions>
+                    <Button
+                      to={generatePath(rootDocsRouteRef.path, {
+                        namespace: entity.metadata.namespace ?? 'default',
+                        kind: entity.kind,
+                        name: entity.metadata.name,
+                      })}
+                      color="primary"
+                    >
+                      Read Docs
+                    </Button>
+                  </CardActions>
+                </Card>
+              ))}
+        </ItemCardGrid>
+      </Content>
+    </Page>
   );
 };

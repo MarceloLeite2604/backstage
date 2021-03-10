@@ -14,15 +14,39 @@
  * limitations under the License.
  */
 
-import { createPlugin } from '@backstage/core';
-import { ScaffolderPage } from './components/ScaffolderPage';
-import { TemplatePage } from './components/TemplatePage';
-import { rootRoute, templateRoute } from './routes';
+import {
+  createPlugin,
+  createApiFactory,
+  discoveryApiRef,
+  identityApiRef,
+  configApiRef,
+  createRoutableExtension,
+} from '@backstage/core';
+import { rootRouteRef } from './routes';
+import { scaffolderApiRef, ScaffolderClient } from './api';
 
-export const plugin = createPlugin({
+export const scaffolderPlugin = createPlugin({
   id: 'scaffolder',
-  register({ router }) {
-    router.addRoute(rootRoute, ScaffolderPage);
-    router.addRoute(templateRoute, TemplatePage);
+  apis: [
+    createApiFactory({
+      api: scaffolderApiRef,
+      deps: {
+        discoveryApi: discoveryApiRef,
+        identityApi: identityApiRef,
+        configApi: configApiRef,
+      },
+      factory: ({ discoveryApi, identityApi, configApi }) =>
+        new ScaffolderClient({ discoveryApi, identityApi, configApi }),
+    }),
+  ],
+  routes: {
+    root: rootRouteRef,
   },
 });
+
+export const ScaffolderPage = scaffolderPlugin.provide(
+  createRoutableExtension({
+    component: () => import('./components/Router').then(m => m.Router),
+    mountPoint: rootRouteRef,
+  }),
+);

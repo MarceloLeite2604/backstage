@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { ConfigReader } from '@backstage/config';
+import { Config } from '@backstage/config';
 import compression from 'compression';
 import cors from 'cors';
 import express, { Router } from 'express';
-import helmet from 'helmet';
+import helmet, { HelmetOptions } from 'helmet';
 import * as http from 'http';
 import stoppable from 'stoppable';
 import { Logger } from 'winston';
@@ -31,22 +31,39 @@ import {
 } from '../../middleware';
 import { ServiceBuilder } from '../types';
 import {
+  CspOptions,
+  HttpsSettings,
   readBaseOptions,
   readCorsOptions,
+  readCspOptions,
   readHttpsSettings,
-  HttpsSettings,
 } from './config';
 import { createHttpServer, createHttpsServer } from './hostFactory';
 
-const DEFAULT_PORT = 7000;
+export const DEFAULT_PORT = 7000;
 // '' is express default, which listens to all interfaces
 const DEFAULT_HOST = '';
+// taken from the helmet source code - don't seem to be exported
+const DEFAULT_CSP = {
+  'default-src': ["'self'"],
+  'base-uri': ["'self'"],
+  'block-all-mixed-content': [],
+  'font-src': ["'self'", 'https:', 'data:'],
+  'frame-ancestors': ["'self'"],
+  'img-src': ["'self'", 'data:'],
+  'object-src': ["'none'"],
+  'script-src': ["'self'", "'unsafe-eval'"],
+  'script-src-attr': ["'none'"],
+  'style-src': ["'self'", 'https:', "'unsafe-inline'"],
+  'upgrade-insecure-requests': [] as string[],
+};
 
 export class ServiceBuilderImpl implements ServiceBuilder {
   private port: number | undefined;
   private host: string | undefined;
   private logger: Logger | undefined;
   private corsOptions: cors.CorsOptions | undefined;
+  private cspOptions: Record<string, string[] | false> | undefined;
   private httpsSettings: HttpsSettings | undefined;
   private routers: [string, Router][];
   // Reference to the module where builder is created - needed for hot module
@@ -58,7 +75,7 @@ export class ServiceBuilderImpl implements ServiceBuilder {
     this.module = moduleRef;
   }
 
-  loadConfig(config: ConfigReader): ServiceBuilder {
+  loadConfig(config: Config): ServiceBuilder {
     const backendConfig = config.getOptionalConfig('backend');
     if (!backendConfig) {
       return this;
@@ -66,7 +83,10 @@ export class ServiceBuilderImpl implements ServiceBuilder {
 
     const baseOptions = readBaseOptions(backendConfig);
     if (baseOptions.listenPort) {
-      this.port = baseOptions.listenPort;
+      this.port =
+        typeof baseOptions.listenPort === 'string'
+          ? parseInt(baseOptions.listenPort, 10)
+          : baseOptions.listenPort;
     }
     if (baseOptions.listenHost) {
       this.host = baseOptions.listenHost;
@@ -75,6 +95,11 @@ export class ServiceBuilderImpl implements ServiceBuilder {
     const corsOptions = readCorsOptions(backendConfig);
     if (corsOptions) {
       this.corsOptions = corsOptions;
+    }
+
+    const cspOptions = readCspOptions(backendConfig);
+    if (cspOptions) {
+      this.cspOptions = cspOptions;
     }
 
     const httpsSettings = readHttpsSettings(backendConfig);
@@ -110,12 +135,17 @@ export class ServiceBuilderImpl implements ServiceBuilder {
     return this;
   }
 
+  setCsp(options: CspOptions): ServiceBuilder {
+    this.cspOptions = options;
+    return this;
+  }
+
   addRouter(root: string, router: Router): ServiceBuilder {
     this.routers.push([root, router]);
     return this;
   }
 
-  start(): Promise<http.Server> {
+  async start(): Promise<http.Server> {
     const app = express();
     const {
       port,
@@ -123,30 +153,30 @@ export class ServiceBuilderImpl implements ServiceBuilder {
       logger,
       corsOptions,
       httpsSettings,
+      helmetOptions,
     } = this.getOptions();
 
-    app.use(helmet());
+    app.use(helmet(helmetOptions));
     if (corsOptions) {
       app.use(cors(corsOptions));
     }
     app.use(compression());
-    app.use(express.json());
-    app.use(requestLoggingHandler());
+    app.use(requestLoggingHandler(logger));
     for (const [root, route] of this.routers) {
       app.use(root, route);
     }
     app.use(notFoundHandler());
     app.use(errorHandler());
 
+    const server: http.Server = httpsSettings
+      ? await createHttpsServer(app, httpsSettings, logger)
+      : createHttpServer(app, logger);
+
     return new Promise((resolve, reject) => {
       app.on('error', e => {
         logger.error(`Failed to start up on port ${port}, ${e}`);
         reject(e);
       });
-
-      const server: http.Server = httpsSettings
-        ? createHttpsServer(app, httpsSettings, logger)
-        : createHttpServer(app, logger);
 
       const stoppableServer = stoppable(
         server.listen(port, host, () => {
@@ -171,6 +201,7 @@ export class ServiceBuilderImpl implements ServiceBuilder {
     logger: Logger;
     corsOptions?: cors.CorsOptions;
     httpsSettings?: HttpsSettings;
+    helmetOptions: HelmetOptions;
   } {
     return {
       port: this.port ?? DEFAULT_PORT,
@@ -178,6 +209,29 @@ export class ServiceBuilderImpl implements ServiceBuilder {
       logger: this.logger ?? getRootLogger(),
       corsOptions: this.corsOptions,
       httpsSettings: this.httpsSettings,
+      helmetOptions: {
+        contentSecurityPolicy: {
+          directives: applyCspDirectives(this.cspOptions),
+        },
+      },
     };
   }
+}
+
+export function applyCspDirectives(
+  directives: Record<string, string[] | false> | undefined,
+): CspOptions | undefined {
+  const result: CspOptions = { ...DEFAULT_CSP };
+
+  if (directives) {
+    for (const [key, value] of Object.entries(directives)) {
+      if (value === false) {
+        delete result[key];
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+
+  return result;
 }

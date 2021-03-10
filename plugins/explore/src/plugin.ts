@@ -14,12 +14,30 @@
  * limitations under the License.
  */
 
-import { createPlugin } from '@backstage/core';
-import ExplorePluginPage from './components/ExplorePluginPage';
+import { createApiFactory, createPlugin } from '@backstage/core';
+import { exploreToolsConfigRef } from '@backstage/plugin-explore-react';
+import { catalogEntityRouteRef, exploreRouteRef } from './routes';
+import { exampleTools } from './util/examples';
 
-export const plugin = createPlugin({
+export const explorePlugin = createPlugin({
   id: 'explore',
-  register({ router }) {
-    router.registerRoute('/explore', ExplorePluginPage);
+  apis: [
+    // Register a default for exploreToolsConfigRef, you may want to override
+    // the API locally in your app.
+    createApiFactory({
+      api: exploreToolsConfigRef,
+      deps: {},
+      factory: () => ({
+        async getTools() {
+          return exampleTools;
+        },
+      }),
+    }),
+  ],
+  routes: {
+    explore: exploreRouteRef,
+  },
+  externalRoutes: {
+    catalogEntity: catalogEntityRouteRef,
   },
 });

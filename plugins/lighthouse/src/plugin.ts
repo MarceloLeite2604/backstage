@@ -14,16 +14,69 @@
  * limitations under the License.
  */
 
-import { createPlugin } from '@backstage/core';
-import AuditList from './components/AuditList';
-import AuditView from './components/AuditView';
-import CreateAudit from './components/CreateAudit';
+import {
+  createPlugin,
+  createRouteRef,
+  createApiFactory,
+  configApiRef,
+  createRoutableExtension,
+  createComponentExtension,
+} from '@backstage/core';
+import { lighthouseApiRef, LighthouseRestApi } from './api';
 
-export const plugin = createPlugin({
+export const rootRouteRef = createRouteRef({
+  path: '',
+  title: 'Lighthouse',
+});
+
+export const viewAuditRouteRef = createRouteRef({
+  path: 'audit/:id',
+  title: 'View Lighthouse Audit',
+});
+
+export const createAuditRouteRef = createRouteRef({
+  path: 'create-audit',
+  title: 'Create Lighthouse Audit',
+});
+
+export const entityContentRouteRef = createRouteRef({
+  title: 'Lighthouse Entity Content',
+});
+
+export const lighthousePlugin = createPlugin({
   id: 'lighthouse',
-  register({ router }) {
-    router.registerRoute('/lighthouse', AuditList);
-    router.registerRoute('/lighthouse/audit/:id', AuditView);
-    router.registerRoute('/lighthouse/create-audit', CreateAudit);
+  apis: [
+    createApiFactory({
+      api: lighthouseApiRef,
+      deps: { configApi: configApiRef },
+      factory: ({ configApi }) => LighthouseRestApi.fromConfig(configApi),
+    }),
+  ],
+  routes: {
+    root: createAuditRouteRef,
+    entityContent: entityContentRouteRef,
   },
 });
+
+export const LighthousePage = lighthousePlugin.provide(
+  createRoutableExtension({
+    component: () => import('./Router').then(m => m.Router),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const EntityLighthouseContent = lighthousePlugin.provide(
+  createRoutableExtension({
+    component: () => import('./Router').then(m => m.EmbeddedRouter),
+    mountPoint: entityContentRouteRef,
+  }),
+);
+
+export const EntityLastLighthouseAuditCard = lighthousePlugin.provide(
+  createComponentExtension({
+    component: {
+      lazy: () =>
+        import('./components/Cards').then(m => m.LastLighthouseAuditCard),
+    },
+  }),
+);

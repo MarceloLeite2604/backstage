@@ -1,30 +1,35 @@
 ---
 id: deployment-other
 title: Other
+description: Documentation on different ways of Deployment
 ---
 
-## Deploying Locally
+## Heroku
 
-### Try on Docker
+Deploying to Heroku is relatively easy following these steps.
 
-Run the following commands if you have Docker environment
-
-```bash
-$ yarn docker-build
-$ docker run --rm -it -p 80:80 spotify/backstage
-```
-
-Then open http://localhost/ on your browser.
-
-### Running with `docker-compose`
-
-Run the following commands if you have docker and docker-compose for a full
-example, with the example backend also deployed.
+First, make sure you have the
+[Heroku CLI installed](https://devcenter.heroku.com/articles/heroku-cli) and log
+into it as well as login into Heroku's
+[container registry](https://devcenter.heroku.com/articles/container-registry-and-runtime).
 
 ```bash
-$ yarn docker-build:all
-$ docker-compose up
+$ heroku login
+$ heroku container:login
 ```
 
-Then open http://localhost:3000 on your browser to see the example app with an
-example backend.
+You _might_ also need to set your Heroku app's stack to `container`.
+
+```bash
+$ heroku stack:set container -a <your-app>
+```
+
+We can now build/push the Docker image to Heroku's container registry and
+release it to the `web` worker.
+
+```bash
+$ heroku container:push web -a <your-app>
+$ heroku container:release web -a <your-app>
+```
+
+With that, you should have Backstage up and running!

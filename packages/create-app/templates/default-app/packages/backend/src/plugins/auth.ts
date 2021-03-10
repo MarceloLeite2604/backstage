@@ -1,10 +1,12 @@
 import { createRouter } from '@backstage/plugin-auth-backend';
+import { Router } from 'express';
 import { PluginEnvironment } from '../types';
 
 export default async function createPlugin({
   logger,
   database,
   config,
-}: PluginEnvironment) {
-  return await createRouter({ logger, config, database });
+  discovery,
+}: PluginEnvironment): Promise<Router> {
+  return await createRouter({ logger, config, database, discovery });
 }

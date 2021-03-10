@@ -32,15 +32,24 @@ module.exports = {
   },
   parserOptions: {
     ecmaVersion: 2018,
+    ecmaFeatures: {
+      jsx: true,
+    },
     sourceType: 'module',
+    lib: require('./tsconfig.json').compilerOptions.lib,
   },
   settings: {
     react: {
       version: 'detect',
     },
   },
-  ignorePatterns: ['.eslintrc.js', '**/dist/**'],
+  ignorePatterns: ['.eslintrc.js', '**/dist/**', '**/dist-types/**'],
   rules: {
+    'no-shadow': 'off',
+    'no-redeclare': 'off',
+    '@typescript-eslint/no-shadow': 'error',
+    '@typescript-eslint/no-redeclare': 'error',
+    'no-undef': 'off',
     'import/newline-after-import': 'error',
     'import/no-duplicates': 'warn',
     'import/no-extraneous-dependencies': [
@@ -54,9 +63,15 @@ module.exports = {
     ],
     'no-unused-expressions': 'off',
     '@typescript-eslint/no-unused-expressions': 'error',
+    '@typescript-eslint/consistent-type-assertions': 'error',
     '@typescript-eslint/no-unused-vars': [
       'warn',
-      { vars: 'all', args: 'after-used', ignoreRestSiblings: true },
+      {
+        vars: 'all',
+        args: 'after-used',
+        ignoreRestSiblings: true,
+        argsIgnorePattern: '^_',
+      },
     ],
     'no-restricted-imports': [
       2,
@@ -80,6 +95,8 @@ module.exports = {
       rules: {
         // Default to not enforcing prop-types in typescript
         'react/prop-types': 0,
+        '@typescript-eslint/no-unused-vars': 'off',
+        'no-undef': 'off',
       },
     },
     {

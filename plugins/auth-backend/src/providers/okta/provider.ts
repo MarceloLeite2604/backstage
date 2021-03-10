@@ -14,7 +14,17 @@
  * limitations under the License.
  */
 import express from 'express';
-import { OAuthProvider } from '../../lib/OAuthProvider';
+import {
+  OAuthAdapter,
+  OAuthProviderOptions,
+  OAuthHandlers,
+  OAuthResponse,
+  OAuthEnvironmentHandler,
+  OAuthStartRequest,
+  encodeState,
+  OAuthRefreshRequest,
+  OAuthResult,
+} from '../../lib/oauth';
 import { Strategy as OktaStrategy } from 'passport-okta-oauth';
 import passport from 'passport';
 import {
@@ -23,19 +33,10 @@ import {
   executeRefreshTokenStrategy,
   makeProfileInfo,
   executeFetchUserProfileStrategy,
-} from '../../lib/PassportStrategyHelper';
-import {
-  OAuthProviderHandlers,
-  RedirectInfo,
-  AuthProviderConfig,
-  OAuthProviderOptions,
-  OAuthResponse,
   PassportDoneCallback,
-} from '../types';
-import { Logger } from 'winston';
+} from '../../lib/passport';
+import { RedirectInfo, AuthProviderFactory } from '../types';
 import { StateStore } from 'passport-oauth2';
-import { TokenIssuer } from '../../identity';
-import { Config } from '@backstage/config';
 
 type PrivateInfo = {
   refreshToken: string;
@@ -45,7 +46,7 @@ export type OktaAuthProviderOptions = OAuthProviderOptions & {
   audience: string;
 };
 
-export class OktaAuthProvider implements OAuthProviderHandlers {
+export class OktaAuthProvider implements OAuthHandlers {
   private readonly _strategy: any;
 
   /**
@@ -80,21 +81,16 @@ export class OktaAuthProvider implements OAuthProviderHandlers {
         accessToken: any,
         refreshToken: any,
         params: any,
-        rawProfile: passport.Profile,
-        done: PassportDoneCallback<OAuthResponse, PrivateInfo>,
+        fullProfile: passport.Profile,
+        done: PassportDoneCallback<OAuthResult, PrivateInfo>,
       ) => {
-        const profile = makeProfileInfo(rawProfile, params.id_token);
-
         done(
           undefined,
           {
-            providerInfo: {
-              idToken: params.id_token,
-              accessToken,
-              scope: params.scope,
-              expiresInSeconds: params.expires_in,
-            },
-            profile,
+            accessToken,
+            refreshToken,
+            params,
+            fullProfile,
           },
           {
             refreshToken,
@@ -104,44 +100,51 @@ export class OktaAuthProvider implements OAuthProviderHandlers {
     );
   }
 
-  async start(
-    req: express.Request,
-    options: Record<string, string>,
-  ): Promise<RedirectInfo> {
-    const providerOptions = {
-      ...options,
+  async start(req: OAuthStartRequest): Promise<RedirectInfo> {
+    return await executeRedirectStrategy(req, this._strategy, {
       accessType: 'offline',
       prompt: 'consent',
-    };
-    return await executeRedirectStrategy(req, this._strategy, providerOptions);
+      scope: req.scope,
+      state: encodeState(req.state),
+    });
   }
 
   async handler(
     req: express.Request,
   ): Promise<{ response: OAuthResponse; refreshToken: string }> {
-    const { response, privateInfo } = await executeFrameHandlerStrategy<
-      OAuthResponse,
+    const { result, privateInfo } = await executeFrameHandlerStrategy<
+      OAuthResult,
       PrivateInfo
     >(req, this._strategy);
 
+    const profile = makeProfileInfo(result.fullProfile, result.params.id_token);
+
     return {
-      response: await this.populateIdentity(response),
+      response: await this.populateIdentity({
+        profile,
+        providerInfo: {
+          idToken: result.params.id_token,
+          accessToken: result.accessToken,
+          scope: result.params.scope,
+          expiresInSeconds: result.params.expires_in,
+        },
+      }),
       refreshToken: privateInfo.refreshToken,
     };
   }
 
-  async refresh(refreshToken: string, scope: string): Promise<OAuthResponse> {
+  async refresh(req: OAuthRefreshRequest): Promise<OAuthResponse> {
     const { accessToken, params } = await executeRefreshTokenStrategy(
       this._strategy,
-      refreshToken,
-      scope,
+      req.refreshToken,
+      req.scope,
     );
 
-    const profile = await executeFetchUserProfileStrategy(
+    const fullProfile = await executeFetchUserProfileStrategy(
       this._strategy,
       accessToken,
-      params.id_token,
     );
+    const profile = makeProfileInfo(fullProfile, params.id_token);
 
     return this.populateIdentity({
       providerInfo: {
@@ -170,29 +173,29 @@ export class OktaAuthProvider implements OAuthProviderHandlers {
   }
 }
 
-export function createOktaProvider(
-  config: AuthProviderConfig,
-  _: string,
-  envConfig: Config,
-  _logger: Logger,
-  tokenIssuer: TokenIssuer,
-) {
-  const providerId = 'okta';
-  const clientId = envConfig.getString('clientId');
-  const clientSecret = envConfig.getString('clientSecret');
-  const audience = envConfig.getString('audience');
-  const callbackUrl = `${config.baseUrl}/${providerId}/handler/frame`;
+export type OktaProviderOptions = {};
 
-  const provider = new OktaAuthProvider({
-    audience,
-    clientId,
-    clientSecret,
-    callbackUrl,
-  });
+export const createOktaProvider = (
+  _options?: OktaProviderOptions,
+): AuthProviderFactory => {
+  return ({ providerId, globalConfig, config, tokenIssuer }) =>
+    OAuthEnvironmentHandler.mapConfig(config, envConfig => {
+      const clientId = envConfig.getString('clientId');
+      const clientSecret = envConfig.getString('clientSecret');
+      const audience = envConfig.getString('audience');
+      const callbackUrl = `${globalConfig.baseUrl}/${providerId}/handler/frame`;
 
-  return OAuthProvider.fromConfig(config, provider, {
-    disableRefresh: false,
-    providerId,
-    tokenIssuer,
-  });
-}
+      const provider = new OktaAuthProvider({
+        audience,
+        clientId,
+        clientSecret,
+        callbackUrl,
+      });
+
+      return OAuthAdapter.fromConfig(globalConfig, provider, {
+        disableRefresh: false,
+        providerId,
+        tokenIssuer,
+      });
+    });
+};

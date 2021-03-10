@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-import { ConfigReader } from '@backstage/config';
-import { loadConfig } from '@backstage/config-loader';
+import fs from 'fs-extra';
 import { Command } from 'commander';
 import { paths } from '../../lib/paths';
 import { serveBackend } from '../../lib/bundler/backend';
 
 export default async (cmd: Command) => {
-  const appConfigs = await loadConfig({
-    env: 'development',
-    rootPaths: [paths.targetRoot, paths.targetDir],
-  });
+  // Cleaning dist/ before we start the dev process helps work around an issue
+  // where we end up with the entrypoint executing multiple times, causing
+  // a port bind conflict among other things.
+  await fs.remove(paths.resolveTarget('dist'));
+
   const waitForExit = await serveBackend({
     entry: 'src/index',
     checksEnabled: cmd.check,
-    config: ConfigReader.fromConfigs(appConfigs),
-    appConfigs,
+    inspectEnabled: cmd.inspect,
   });
 
   await waitForExit();

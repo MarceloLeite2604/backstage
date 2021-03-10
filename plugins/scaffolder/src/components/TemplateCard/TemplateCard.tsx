@@ -13,32 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Button, pageTheme } from '@backstage/core';
-import { Card, Chip, makeStyles, Typography } from '@material-ui/core';
+import { Button, ItemCardHeader, useRouteRef } from '@backstage/core';
+import { BackstageTheme, pageTheme } from '@backstage/theme';
+import {
+  Box,
+  Card,
+  CardActions,
+  CardContent,
+  CardMedia,
+  Chip,
+  makeStyles,
+  useTheme,
+} from '@material-ui/core';
 import React from 'react';
-import { generatePath } from 'react-router-dom';
-import { templateRoute } from '../../routes';
+import { generatePath } from 'react-router';
+import { rootRouteRef } from '../../routes';
 
-const useStyles = makeStyles(theme => ({
-  header: {
-    color: theme.palette.common.white,
-    padding: theme.spacing(2, 2, 6),
-    backgroundImage: (props: { gradientStart: string; gradientStop: string }) =>
-      `linear-gradient(-137deg, ${props.gradientStart} 0%, ${props.gradientStop} 100%)`,
-  },
-  content: {
-    padding: theme.spacing(2),
+const useStyles = makeStyles({
+  title: {
+    backgroundImage: ({ backgroundImage }: any) => backgroundImage,
   },
   description: {
-    height: 175,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    display: '-webkit-box',
+    '-webkit-line-clamp': 10,
+    '-webkit-box-orient': 'vertical',
   },
-  footer: {
-    display: 'flex',
-    flexDirection: 'row-reverse',
-  },
-}));
+});
 
 export type TemplateCardProps = {
   description: string;
@@ -55,30 +57,38 @@ export const TemplateCard = ({
   type,
   name,
 }: TemplateCardProps) => {
-  const theme = pageTheme[type] ?? pageTheme.other;
-  const [gradientStart, gradientStop] = theme.colors;
-  const classes = useStyles({ gradientStart, gradientStop });
-  const href = generatePath(templateRoute.path, { templateName: name });
+  const backstageTheme = useTheme<BackstageTheme>();
+  const rootLink = useRouteRef(rootRouteRef);
+
+  const themeId = pageTheme[type] ? type : 'other';
+  const theme = backstageTheme.getPageTheme({ themeId });
+  const classes = useStyles({ backgroundImage: theme.backgroundImage });
+  const href = generatePath(`${rootLink()}/templates/:templateName`, {
+    templateName: name,
+  });
 
   return (
     <Card>
-      <div className={classes.header}>
-        <Typography variant="subtitle2">{type}</Typography>
-        <Typography variant="h6">{title}</Typography>
-      </div>
-      <div className={classes.content}>
-        {tags?.map(tag => (
-          <Chip label={tag} key={tag} />
-        ))}
-        <Typography variant="body2" paragraph className={classes.description}>
-          {description}
-        </Typography>
-        <div className={classes.footer}>
-          <Button color="primary" to={href}>
-            Choose
-          </Button>
-        </div>
-      </div>
+      <CardMedia>
+        <ItemCardHeader
+          title={title}
+          subtitle={type}
+          classes={{ root: classes.title }}
+        />
+      </CardMedia>
+      <CardContent>
+        <Box>
+          {tags?.map(tag => (
+            <Chip size="small" label={tag} key={tag} />
+          ))}
+        </Box>
+        <Box className={classes.description}>{description}</Box>
+      </CardContent>
+      <CardActions>
+        <Button color="primary" to={href}>
+          Choose
+        </Button>
+      </CardActions>
     </Card>
   );
 };

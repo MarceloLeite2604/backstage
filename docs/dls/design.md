@@ -1,6 +1,7 @@
 ---
 id: design
 title: Design
+description: Documentation on Design
 ---
 
 ![header](../assets/dls/designheader-updated.png)
@@ -32,22 +33,25 @@ our users.
 ### Transparent
 
 There are a lot of exciting things coming up and we want to keep you in the
-loop! Keep an eye on our Milestones in GitHub to see where we’re headed. We’ll
-also be posting updates in the _#design_ channel on
-[Discord](https://discord.gg/EBHEGzX). Not only that, we want to keep you
-informed on the decisions we’ve made and why we’ve made them.
+loop! Keep an eye on our
+[Milestones in GitHub](https://github.com/backstage/backstage/milestones) to see
+where we're headed and review the
+[open design issues](https://github.com/backstage/backstage/issues?q=is%3Aopen+is%3Aissue+label%3Adesign),
+to see if you can help. We'll also be posting updates in the _#design_ channel
+on [Discord](https://discord.gg/EBHEGzX). Not only that, we want to keep you
+informed on the decisions we've made and why we've made them.
 
 ## 🛠 Our Practice
 
-The chart below details how we work. **_Stay tuned_**: We are currently in the
-process of securing a Figma workspace for Backstage Open Source, and we plan on
+The chart below details how we work. We have a
+[Figma workspace for Backstage Open Source](figma.md), and we plan on
 referencing Figma documents to share specs and prototypes with the community.
 
 ### Creating a New Design Component
 
-| Step 1                                                                                            | Step 2                                                                           | Step 3                                                                                        | Step 4                                                                   | Step 5                                                                       | Step 6                                                                                 |
-| :------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- | :--------------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
-| Platform design team submits an issue to **spotify/Backstage GitHub** with a potential component. | Backstage community offers feedback or approval on **spotify/Backstage GitHub**. | Platform design team adjusts accordingly (as they see fit) and update the Figma DLS document. | Designed component is added to **spotify/Backstage GitHub** as an issue. | External or internal Backstage open source contributors build the component. | External or internal contributors add the component to the **Backstage Storybook**. 🎉 |
+| Step 1                                                                                              | Step 2                                                                             | Step 3                                                                                        | Step 4                                                                     | Step 5                                                                       | Step 6                                                                                 |
+| :-------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------- | :--------------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| Platform design team submits an issue to **backstage/backstage GitHub** with a potential component. | Backstage community offers feedback or approval on **backstage/backstage GitHub**. | Platform design team adjusts accordingly (as they see fit) and update the Figma DLS document. | Designed component is added to **backstage/backstage GitHub** as an issue. | External or internal Backstage open source contributors build the component. | External or internal contributors add the component to the **Backstage Storybook**. 🎉 |
 
 ### Building for Backstage
 
@@ -55,9 +59,9 @@ referencing Figma documents to share specs and prototypes with the community.
 | :------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------- |
 | External or internal contributors use Backstage and come up with an idea of an entity to build for Backstage. | External or internal contributors refer to the Backstage Open Source design system documentation in the Figma DLS document. | External or internal contributors leverage the components and tokens from the Backstage Storybook. | External or internal contributors build their Backstage entity. |
 
-| Step 5                                                                                                         | Step 6                                                                                                     | Step 7                                                                                                                            | Step 8                                                                                            |
-| :------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------ |
-| External or internal contributors make a pull request for their entity on spotify/Backstage GitHub for review. | Platform designers and devs review the entity and submit feedback or approval on spotify/Backstage GitHub. | External or internal contributors make the changes, pull request is approved and the entity is merged. It’s live on Backstage! 🎉 | If the entity happens to be or include a UX component, it’s added to Backstage Storybook as well. |
+| Step 5                                                                                                           | Step 6                                                                                                       | Step 7                                                                                                                            | Step 8                                                                                            |
+| :--------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------ |
+| External or internal contributors make a pull request for their entity on backstage/backstage GitHub for review. | Platform designers and devs review the entity and submit feedback or approval on backstage/backstage GitHub. | External or internal contributors make the changes, pull request is approved and the entity is merged. It’s live on Backstage! 🎉 | If the entity happens to be or include a UX component, it’s added to Backstage Storybook as well. |
 
 The following diagram shows the relationship between the Backstage Design System
 and our foundation, which comprises of [Material UI](https://material-ui.com/)
@@ -98,9 +102,10 @@ issues in GitHub with ‘design’ and/or ‘storybook’ - so feel free to brow
 tackle the tasks that interest you. If you have any questions regarding an
 issue, you can ask them in the comments section of the issue or on
 [Discord](https://discord.gg/EBHEGzX). We absolutely adore our external
-contributors and will send you virtual semlas for your contributions!
+contributors and will send you virtual
+[semlas](https://en.wikipedia.org/wiki/Semla) for your contributions!
 
-### Request a component.
+### Request a component
 
 Create an issue (label it design and assign it to katz95) or send us a message
 on [Discord](https://discord.gg/EBHEGzX) (_#design_ channel) with details of
@@ -116,11 +121,15 @@ components. If you’d like to help build up our design system, you can also add
 components we’ve designed to the Storybook as well.
 
 **[Figma](https://www.figma.com/@backstage)** - we're stoked to be using Figma
-Community to share our design assets. You can duplicate our UI Kit
-and design your own plugin for Backstage.
+Community to share our design assets. You can duplicate our UI Kit and design
+your own plugin for Backstage.
 
 **[Discord](https://discord.gg/EBHEGzX)** - all design questions should be
 directed to the _#design_ channel.
+
+**[Customize Backstage's look and feel](https://backstage.io/docs/getting-started/app-custom-theme)** -
+How to customize the look and feel of your Backstage instance by extending the
+theme.
 
 ## 🔮 Future
 
@@ -134,5 +143,3 @@ contributing to Backstage as a designer is easy. From styling guidelines to UX
 principles to Figma documents, we’ll make sure you’re equipped to chip in on
 this project. We’re excited to work with you! In the meantime, we’d love to hear
 from you on [Discord](https://discord.gg/EBHEGzX).
-
-[Back to Docs](../README.md)

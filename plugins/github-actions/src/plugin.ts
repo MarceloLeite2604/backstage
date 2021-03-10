@@ -14,29 +14,73 @@
  * limitations under the License.
  */
 
-import { createPlugin, createRouteRef } from '@backstage/core';
-import { WorkflowRunDetailsPage } from './components/WorkflowRunDetailsPage';
-import { WorkflowRunsPage } from './components/WorkflowRunsPage';
+import {
+  configApiRef,
+  createPlugin,
+  createRouteRef,
+  createApiFactory,
+  githubAuthApiRef,
+  createRoutableExtension,
+  createComponentExtension,
+} from '@backstage/core';
+import { githubActionsApiRef, GithubActionsClient } from './api';
 
 // TODO(freben): This is just a demo route for now
 export const rootRouteRef = createRouteRef({
-  path: '/github-actions',
+  path: '',
   title: 'GitHub Actions',
 });
-export const projectRouteRef = createRouteRef({
-  path: '/github-actions/:kind/:optionalNamespaceAndName/',
-  title: 'GitHub Actions for project',
-});
+
 export const buildRouteRef = createRouteRef({
-  path: '/github-actions/workflow-run/:id',
+  path: ':id',
   title: 'GitHub Actions Workflow Run',
 });
 
-export const plugin = createPlugin({
+export const githubActionsPlugin = createPlugin({
   id: 'github-actions',
-  register({ router }) {
-    router.addRoute(rootRouteRef, WorkflowRunsPage);
-    router.addRoute(projectRouteRef, WorkflowRunsPage);
-    router.addRoute(buildRouteRef, WorkflowRunDetailsPage);
+  apis: [
+    createApiFactory({
+      api: githubActionsApiRef,
+      deps: { configApi: configApiRef, githubAuthApi: githubAuthApiRef },
+      factory: ({ configApi, githubAuthApi }) =>
+        new GithubActionsClient({ configApi, githubAuthApi }),
+    }),
+  ],
+  routes: {
+    entityContent: rootRouteRef,
   },
 });
+
+export const EntityGithubActionsContent = githubActionsPlugin.provide(
+  createRoutableExtension({
+    component: () => import('./components/Router').then(m => m.Router),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const EntityLatestGithubActionRunCard = githubActionsPlugin.provide(
+  createComponentExtension({
+    component: {
+      lazy: () =>
+        import('./components/Cards').then(m => m.LatestWorkflowRunCard),
+    },
+  }),
+);
+
+export const EntityLatestGithubActionsForBranchCard = githubActionsPlugin.provide(
+  createComponentExtension({
+    component: {
+      lazy: () =>
+        import('./components/Cards').then(m => m.LatestWorkflowsForBranchCard),
+    },
+  }),
+);
+
+export const EntityRecentGithubActionsRunsCard = githubActionsPlugin.provide(
+  createComponentExtension({
+    component: {
+      lazy: () =>
+        import('./components/Cards').then(m => m.RecentWorkflowRunsCard),
+    },
+  }),
+);

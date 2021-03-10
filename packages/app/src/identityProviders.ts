@@ -19,14 +19,37 @@ import {
   gitlabAuthApiRef,
   oktaAuthApiRef,
   githubAuthApiRef,
+  samlAuthApiRef,
+  microsoftAuthApiRef,
+  oneloginAuthApiRef,
+  oauth2ApiRef,
+  oidcAuthApiRef,
 } from '@backstage/core';
 
 export const providers = [
+  {
+    id: 'oidc-auth-provider',
+    title: 'Oidc',
+    message: 'Sign In using OpenId Connect',
+    apiRef: oidcAuthApiRef,
+  },
+  {
+    id: 'oauth2-auth-provider',
+    title: 'OAuth 2.0',
+    message: 'Sign In using OAuth 2.0',
+    apiRef: oauth2ApiRef,
+  },
   {
     id: 'google-auth-provider',
     title: 'Google',
     message: 'Sign In using Google',
     apiRef: googleAuthApiRef,
+  },
+  {
+    id: 'microsoft-auth-provider',
+    title: 'Microsoft',
+    message: 'Sign In using Microsoft Azure AD',
+    apiRef: microsoftAuthApiRef,
   },
   {
     id: 'gitlab-auth-provider',
@@ -45,5 +68,17 @@ export const providers = [
     title: 'Okta',
     message: 'Sign In using Okta',
     apiRef: oktaAuthApiRef,
+  },
+  {
+    id: 'saml-auth-provider',
+    title: 'SAML',
+    message: 'Sign In using SAML',
+    apiRef: samlAuthApiRef,
+  },
+  {
+    id: 'onelogin-auth-provider',
+    title: 'OneLogin',
+    message: 'Sign In using OneLogin',
+    apiRef: oneloginAuthApiRef,
   },
 ];

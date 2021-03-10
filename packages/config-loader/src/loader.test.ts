@@ -15,62 +15,49 @@
  */
 
 import { loadConfig } from './loader';
-
-jest.mock('fs-extra', () => {
-  const mockFiles: { [path in string]: string } = {
-    '/root/app-config.yaml': `
-      app:
-        title: Example App
-        sessionKey:
-          $secret:
-            file: secrets/session-key.txt
-    `,
-    '/root/app-config.development.yaml': `
-      app:
-        sessionKey: development-key
-    `,
-    '/root/secrets/session-key.txt': 'abc123',
-  };
-
-  return {
-    async readFile(path: string) {
-      if (path in mockFiles) {
-        return mockFiles[path];
-      }
-      throw new Error(`File not found, ${path}`);
-    },
-    async pathExists(path: string) {
-      return path in mockFiles;
-    },
-  };
-});
+import mockFs from 'mock-fs';
 
 describe('loadConfig', () => {
-  it('loads config without secrets', async () => {
-    await expect(
-      loadConfig({
-        rootPaths: ['/root'],
-        env: 'production',
-        shouldReadSecrets: false,
-      }),
-    ).resolves.toEqual([
-      {
-        context: 'app-config.yaml',
-        data: {
-          app: {
-            title: 'Example App',
-          },
-        },
-      },
-    ]);
+  beforeAll(() => {
+    process.env.MY_SECRET = 'is-secret';
+
+    mockFs({
+      '/root/app-config.yaml': `
+        app:
+          title: Example App
+          sessionKey:
+            $file: secrets/session-key.txt
+      `,
+      '/root/app-config.development.yaml': `
+        app:
+          sessionKey: development-key
+        backend:
+          $include: ./included.yaml
+        other:
+          $include: secrets/included.yaml
+      `,
+      '/root/secrets/session-key.txt': 'abc123',
+      '/root/secrets/included.yaml': `
+        secret:
+          $file: session-key.txt
+      `,
+      '/root/included.yaml': `
+        foo:
+          bar: token \${MY_SECRET}
+      `,
+    });
   });
 
-  it('loads config with secrets', async () => {
+  afterAll(() => {
+    mockFs.restore();
+  });
+
+  it('load config from default path', async () => {
     await expect(
       loadConfig({
-        rootPaths: ['/root'],
+        configRoot: '/root',
+        configPaths: [],
         env: 'production',
-        shouldReadSecrets: true,
       }),
     ).resolves.toEqual([
       {
@@ -85,12 +72,12 @@ describe('loadConfig', () => {
     ]);
   });
 
-  it('loads development config without secrets', async () => {
+  it('loads config with secrets', async () => {
     await expect(
       loadConfig({
-        rootPaths: ['/root'],
-        env: 'development',
-        shouldReadSecrets: false,
+        configRoot: '/root',
+        configPaths: ['/root/app-config.yaml'],
+        env: 'production',
       }),
     ).resolves.toEqual([
       {
@@ -98,13 +85,8 @@ describe('loadConfig', () => {
         data: {
           app: {
             title: 'Example App',
+            sessionKey: 'abc123',
           },
-        },
-      },
-      {
-        context: 'app-config.development.yaml',
-        data: {
-          app: {},
         },
       },
     ]);
@@ -113,9 +95,12 @@ describe('loadConfig', () => {
   it('loads development config with secrets', async () => {
     await expect(
       loadConfig({
-        rootPaths: ['/root'],
+        configRoot: '/root',
+        configPaths: [
+          '/root/app-config.yaml',
+          '/root/app-config.development.yaml',
+        ],
         env: 'development',
-        shouldReadSecrets: true,
       }),
     ).resolves.toEqual([
       {
@@ -132,6 +117,14 @@ describe('loadConfig', () => {
         data: {
           app: {
             sessionKey: 'development-key',
+          },
+          backend: {
+            foo: {
+              bar: 'token is-secret',
+            },
+          },
+          other: {
+            secret: 'abc123',
           },
         },
       },

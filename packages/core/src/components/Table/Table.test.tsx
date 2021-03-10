@@ -15,8 +15,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react';
-import { wrapInTestApp } from '@backstage/test-utils';
+import { renderInTestApp } from '@backstage/test-utils';
 import { Table } from './Table';
 
 const minProps = {
@@ -43,15 +42,27 @@ const minProps = {
 };
 
 describe('<Table />', () => {
-  it('renders without exploding', () => {
-    const rendered = render(wrapInTestApp(<Table {...minProps} />));
+  it('renders without exploding', async () => {
+    const rendered = await renderInTestApp(<Table {...minProps} />);
     expect(rendered.getByText('second value, second row')).toBeInTheDocument();
   });
 
-  it('renders with subtitle', () => {
-    const rendered = render(
-      wrapInTestApp(<Table subtitle="subtitle" {...minProps} />),
+  it('renders with subtitle', async () => {
+    const rendered = await renderInTestApp(
+      <Table subtitle="subtitle" {...minProps} />,
     );
     expect(rendered.getByText('subtitle')).toBeInTheDocument();
+  });
+
+  it('renders custom empty component if empty', async () => {
+    const rendered = await renderInTestApp(
+      <Table
+        subtitle="subtitle"
+        emptyContent={<div>EMPTY</div>}
+        columns={minProps.columns}
+        data={[]}
+      />,
+    );
+    expect(rendered.getByText('EMPTY')).toBeInTheDocument();
   });
 });

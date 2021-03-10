@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import React, { useState, useMemo, FC, ReactNode } from 'react';
+import React, { useState, useMemo, ReactNode } from 'react';
 import { useLocalStorage, useAsync } from 'react-use';
 import { useNavigate } from 'react-router-dom';
 import { Grid, Button } from '@material-ui/core';
-import Alert from '@material-ui/lab/Alert';
 import Pagination from '@material-ui/lab/Pagination';
 import {
   InfoCard,
@@ -28,8 +26,8 @@ import {
   ContentHeader,
   HeaderLabel,
   Progress,
-  pageTheme,
   useApi,
+  WarningPanel,
 } from '@backstage/core';
 
 import { lighthouseApiRef } from '../../api';
@@ -40,7 +38,7 @@ import AuditListTable from './AuditListTable';
 
 export const LIMIT = 10;
 
-const AuditList: FC<{}> = () => {
+const AuditList = () => {
   const [dismissedStored] = useLocalStorage(LIGHTHOUSE_INTRO_LOCAL_STORAGE);
   const [dismissed, setDismissed] = useState(dismissedStored);
 
@@ -77,7 +75,7 @@ const AuditList: FC<{}> = () => {
             page={page}
             count={pageCount}
             onChange={(_event: Event, newPage: number) => {
-              navigate(`/lighthouse?page=${newPage}`);
+              navigate(`?page=${newPage}`);
             }}
           />
         )}
@@ -87,14 +85,14 @@ const AuditList: FC<{}> = () => {
     content = <Progress />;
   } else if (error) {
     content = (
-      <Alert severity="error" data-testid="error-message">
+      <WarningPanel severity="error" title="Could not load audit list.">
         {error.message}
-      </Alert>
+      </WarningPanel>
     );
   }
 
   return (
-    <Page theme={pageTheme.tool}>
+    <Page themeId="tool">
       <Header
         title="Lighthouse"
         subtitle="Website audits powered by Lighthouse"
@@ -111,7 +109,7 @@ const AuditList: FC<{}> = () => {
           <Button
             variant="contained"
             color="primary"
-            href="/lighthouse/create-audit"
+            onClick={() => navigate('create-audit')}
           >
             Create Audit
           </Button>
@@ -119,7 +117,7 @@ const AuditList: FC<{}> = () => {
         </ContentHeader>
         <Grid container spacing={3} direction="column">
           <Grid item>
-            <InfoCard>{content}</InfoCard>
+            <InfoCard noPadding>{content}</InfoCard>
           </Grid>
         </Grid>
       </Content>

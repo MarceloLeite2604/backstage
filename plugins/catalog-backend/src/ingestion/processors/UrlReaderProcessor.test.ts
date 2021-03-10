@@ -14,25 +14,38 @@
  * limitations under the License.
  */
 
-import { UrlReaderProcessor } from './UrlReaderProcessor';
 import {
-  LocationProcessorDataResult,
-  LocationProcessorResult,
-  LocationProcessorErrorResult,
-} from './types';
-import { setupServer } from 'msw/node';
+  getVoidLogger,
+  UrlReader,
+  UrlReaders,
+} from '@backstage/backend-common';
+import { ConfigReader } from '@backstage/config';
+import { msw } from '@backstage/test-utils';
 import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+import {
+  CatalogProcessorEntityResult,
+  CatalogProcessorErrorResult,
+  CatalogProcessorResult,
+} from './types';
+import { UrlReaderProcessor } from './UrlReaderProcessor';
+import { defaultEntityDataParser } from './util/parse';
 
 describe('UrlReaderProcessor', () => {
-  const mockApiOrigin = 'http://localhost:23000';
-  const server = setupServer();
+  const mockApiOrigin = 'http://localhost';
 
-  beforeAll(() => server.listen());
-  afterEach(() => server.resetHandlers());
-  afterAll(() => server.close());
+  const server = setupServer();
+  msw.setupDefaultHandlers(server);
 
   it('should load from url', async () => {
-    const processor = new UrlReaderProcessor();
+    const logger = getVoidLogger();
+    const reader = UrlReaders.default({
+      logger,
+      config: new ConfigReader({
+        backend: { reading: { allow: [{ host: 'localhost' }] } },
+      }),
+    });
+    const processor = new UrlReaderProcessor({ reader, logger });
     const spec = {
       type: 'url',
       target: `${mockApiOrigin}/component.yaml`,
@@ -40,21 +53,28 @@ describe('UrlReaderProcessor', () => {
 
     server.use(
       rest.get(`${mockApiOrigin}/component.yaml`, (_, res, ctx) =>
-        res(ctx.body('Hello')),
+        res(ctx.json({ mock: 'entity' })),
       ),
     );
 
-    const generated = (await new Promise<LocationProcessorResult>(emit =>
-      processor.readLocation(spec, false, emit),
-    )) as LocationProcessorDataResult;
+    const generated = (await new Promise<CatalogProcessorResult>(emit =>
+      processor.readLocation(spec, false, emit, defaultEntityDataParser),
+    )) as CatalogProcessorEntityResult;
 
-    expect(generated.type).toBe('data');
-    expect(generated.location).toBe(spec);
-    expect(generated.data.toString('utf8')).toBe('Hello');
+    expect(generated.type).toBe('entity');
+    expect(generated.location).toEqual(spec);
+    expect(generated.entity).toEqual({ mock: 'entity' });
   });
 
   it('should fail load from url with error', async () => {
-    const processor = new UrlReaderProcessor();
+    const logger = getVoidLogger();
+    const reader = UrlReaders.default({
+      logger,
+      config: new ConfigReader({
+        backend: { reading: { allow: [{ host: 'localhost' }] } },
+      }),
+    });
+    const processor = new UrlReaderProcessor({ reader, logger });
     const spec = {
       type: 'url',
       target: `${mockApiOrigin}/component-notfound.yaml`,
@@ -66,15 +86,38 @@ describe('UrlReaderProcessor', () => {
       }),
     );
 
-    const generated = (await new Promise<LocationProcessorResult>(emit =>
-      processor.readLocation(spec, false, emit),
-    )) as LocationProcessorErrorResult;
+    const generated = (await new Promise<CatalogProcessorResult>(emit =>
+      processor.readLocation(spec, false, emit, defaultEntityDataParser),
+    )) as CatalogProcessorErrorResult;
 
     expect(generated.type).toBe('error');
     expect(generated.location).toBe(spec);
     expect(generated.error.name).toBe('NotFoundError');
     expect(generated.error.message).toBe(
-      `${mockApiOrigin}/component-notfound.yaml could not be read, 404 Not Found`,
+      `Unable to read url, NotFoundError: could not read ${mockApiOrigin}/component-notfound.yaml, 404 Not Found`,
     );
+  });
+
+  it('uses search when there are globs', async () => {
+    const logger = getVoidLogger();
+
+    const reader: jest.Mocked<UrlReader> = {
+      read: jest.fn(),
+      readTree: jest.fn(),
+      search: jest.fn().mockImplementation(async () => []),
+    };
+
+    const processor = new UrlReaderProcessor({ reader, logger });
+
+    const emit = jest.fn();
+
+    await processor.readLocation(
+      { type: 'url', target: 'https://github.com/a/b/blob/x/**/b.yaml' },
+      false,
+      emit,
+      defaultEntityDataParser,
+    );
+
+    expect(reader.search).toBeCalledTimes(1);
   });
 });

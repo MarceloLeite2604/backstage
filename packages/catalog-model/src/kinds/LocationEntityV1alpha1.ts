@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-import * as yup from 'yup';
 import type { Entity } from '../entity/Entity';
-import type { EntityPolicy } from '../types';
+import schema from '../schema/kinds/Location.v1alpha1.schema.json';
+import entitySchema from '../schema/Entity.schema.json';
+import entityMetaSchema from '../schema/EntityMeta.schema.json';
+import commonSchema from '../schema/shared/common.schema.json';
+import { ajvCompiledJsonSchemaValidator } from './util';
 
 const API_VERSION = ['backstage.io/v1alpha1', 'backstage.io/v1beta1'] as const;
 const KIND = 'Location' as const;
@@ -25,30 +28,15 @@ export interface LocationEntityV1alpha1 extends Entity {
   apiVersion: typeof API_VERSION[number];
   kind: typeof KIND;
   spec: {
-    type: string;
+    type?: string;
     target?: string;
     targets?: string[];
   };
 }
 
-export class LocationEntityV1alpha1Policy implements EntityPolicy {
-  private schema: yup.Schema<any>;
-
-  constructor() {
-    this.schema = yup.object<Partial<LocationEntityV1alpha1>>({
-      apiVersion: yup.string().required().oneOf(API_VERSION),
-      kind: yup.string().required().equals([KIND]),
-      spec: yup
-        .object({
-          type: yup.string().required().min(1),
-          target: yup.string().notRequired().min(1),
-          targets: yup.array(yup.string()).notRequired(),
-        })
-        .required(),
-    });
-  }
-
-  async enforce(envelope: Entity): Promise<Entity> {
-    return await this.schema.validate(envelope, { strict: true });
-  }
-}
+export const locationEntityV1alpha1Validator = ajvCompiledJsonSchemaValidator(
+  KIND,
+  API_VERSION,
+  schema,
+  [commonSchema, entityMetaSchema, entitySchema],
+);

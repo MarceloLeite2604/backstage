@@ -3,15 +3,17 @@
     "Overview": [
       "overview/what-is-backstage",
       "overview/architecture-overview",
-      "overview/architecture-terminology",
       "overview/roadmap",
-      "overview/vision"
+      "overview/vision",
+      "overview/background",
+      "overview/adopting",
+      "overview/stability-index",
+      "overview/logos"
     ],
     "Getting Started": [
       "getting-started/index",
-      "getting-started/installation",
-      "getting-started/development-environment",
       "getting-started/create-an-app",
+      "getting-started/running-backstage-locally",
       {
         "type": "subcategory",
         "label": "App configuration",
@@ -24,20 +26,29 @@
         "type": "subcategory",
         "label": "Deployment",
         "ids": [
+          "getting-started/deployment-docker",
           "getting-started/deployment-k8s",
+          "getting-started/deployment-helm",
           "getting-started/deployment-other"
         ]
-      }
+      },
+      "getting-started/keeping-backstage-updated",
+      "getting-started/contributors"
     ],
-    "Features": [
+    "CLI": ["cli/index", "cli/commands"],
+    "Core Features": [
       {
         "type": "subcategory",
         "label": "Software Catalog",
         "ids": [
           "features/software-catalog/software-catalog-overview",
+          "features/software-catalog/installation",
+          "features/software-catalog/configuration",
           "features/software-catalog/system-model",
           "features/software-catalog/descriptor-format",
-          "features/software-catalog/populating-catalog",
+          "features/software-catalog/references",
+          "features/software-catalog/well-known-annotations",
+          "features/software-catalog/well-known-relations",
           "features/software-catalog/extending-the-model",
           "features/software-catalog/external-integrations",
           "features/software-catalog/software-catalog-api"
@@ -45,26 +56,68 @@
       },
       {
         "type": "subcategory",
-        "label": "Software creation templates",
+        "label": "Kubernetes",
         "ids": [
-          "features/software-templates/software-templates-index",
-          "features/software-templates/adding-templates",
-          "features/software-templates/extending/extending-index",
-          "features/software-templates/extending/extending-templater",
-          "features/software-templates/extending/extending-publisher",
-          "features/software-templates/extending/extending-preparer"
+          "features/kubernetes/overview",
+          "features/kubernetes/installation",
+          "features/kubernetes/configuration",
+          "features/kubernetes/troubleshooting"
         ]
       },
       {
         "type": "subcategory",
-        "label": "Docs-like-code",
+        "label": "Software Templates",
+        "ids": [
+          "features/software-templates/software-templates-index",
+          "features/software-templates/installation",
+          "features/software-templates/adding-templates",
+          "features/software-templates/writing-templates",
+          "features/software-templates/builtin-actions",
+          "features/software-templates/writing-custom-actions",
+          "features/software-templates/template-legacy"
+        ]
+      },
+      {
+        "type": "subcategory",
+        "label": "Backstage Search",
+        "ids": [
+          "features/search/search-overview",
+          "features/search/architecture"
+        ]
+      },
+      {
+        "type": "subcategory",
+        "label": "TechDocs",
         "ids": [
           "features/techdocs/techdocs-overview",
           "features/techdocs/getting-started",
           "features/techdocs/concepts",
+          "features/techdocs/architecture",
           "features/techdocs/creating-and-publishing",
+          "features/techdocs/configuration",
+          "features/techdocs/using-cloud-storage",
+          "features/techdocs/configuring-ci-cd",
+          "features/techdocs/how-to-guides",
+          "features/techdocs/troubleshooting",
           "features/techdocs/faqs"
         ]
+      }
+    ],
+    "Integrations": [
+      {
+        "type": "subcategory",
+        "label": "GitHub",
+        "ids": ["integrations/github/org"]
+      },
+      {
+        "type": "subcategory",
+        "label": "LDAP",
+        "ids": ["integrations/ldap/org"]
+      },
+      {
+        "type": "subcategory",
+        "label": "Google Analytics",
+        "ids": ["integrations/google-analytics/installation"]
       }
     ],
     "Plugins": [
@@ -73,13 +126,16 @@
       "plugins/create-a-plugin",
       "plugins/plugin-development",
       "plugins/structure-of-a-plugin",
+      "plugins/integrating-plugin-into-service-catalog",
+      "plugins/composability",
       {
         "type": "subcategory",
         "label": "Backends and APIs",
         "ids": [
           "plugins/proxying",
           "plugins/backend-plugin",
-          "plugins/call-existing-api"
+          "plugins/call-existing-api",
+          "plugins/github-apps"
         ]
       },
       {
@@ -90,7 +146,12 @@
       {
         "type": "subcategory",
         "label": "Publishing",
-        "ids": ["plugins/publishing", "plugins/publish-private"]
+        "ids": [
+          "plugins/publishing",
+          "plugins/publish-private",
+          "plugins/add-to-marketplace",
+          "plugins/observability"
+        ]
       }
     ],
     "Configuration": [
@@ -107,7 +168,6 @@
       "auth/glossary",
       "auth/auth-backend-classes"
     ],
-
     "Designing for Backstage": [
       "dls/design",
       "dls/contributing-to-storybook",
@@ -121,8 +181,7 @@
           "api/utility-apis",
           "reference/utility-apis/README",
           "reference/createPlugin",
-          "reference/createPlugin-feature-flags",
-          "reference/createPlugin-router"
+          "reference/createPlugin-feature-flags"
         ]
       },
       {
@@ -131,7 +190,11 @@
         "ids": ["api/backend"]
       }
     ],
-    "Tutorials": ["tutorials/index"],
+    "Tutorials": [
+      "tutorials/journey",
+      "tutorials/quickstart-app-auth",
+      "tutorials/quickstart-app-plugin"
+    ],
     "Architecture Decision Records (ADRs)": [
       "architecture-decisions/adrs-overview",
       "architecture-decisions/adrs-adr001",
@@ -141,10 +204,13 @@
       "architecture-decisions/adrs-adr005",
       "architecture-decisions/adrs-adr006",
       "architecture-decisions/adrs-adr007",
-      "architecture-decisions/adrs-adr008"
+      "architecture-decisions/adrs-adr008",
+      "architecture-decisions/adrs-adr009",
+      "architecture-decisions/adrs-adr010",
+      "architecture-decisions/adrs-adr011"
     ],
-    "Contribute": ["../CONTRIBUTING"],
-    "Support": ["overview/support"],
+    "Support": ["support/support", "support/project-structure"],
+    "Glossary": ["glossary"],
     "FAQ": ["FAQ"]
   }
 }
